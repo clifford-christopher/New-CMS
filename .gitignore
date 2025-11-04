@@ -1,0 +1,122 @@
+# AI-Powered News CMS - Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Logs
+logs
+*.log
+
+# AWS
+.aws-sam/
+samconfig.toml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets (NEVER COMMIT THESE)
+*secret*
+*key*.json
+credentials.json
+*.pem
+
+# Test Coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# Build outputs
+*.pyc
+*.pyo
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Claude/AI Tools
+.bmad-core
+.claude
+
+# User-specific data and uploads
+uploads/
+media/
+static/uploads/
+user_data/
+
+# Generated files
+*.generated.*
+*.gen.*

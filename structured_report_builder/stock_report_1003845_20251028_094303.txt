@@ -1,0 +1,641 @@
+================================================================================
+SECTION 1: COMPANY INFORMATION
+================================================================================
+
+
+Company Name: Mankind Pharma Ltd
+Ticker Symbol: MANKIND (NSE), 543904 (BSE)
+ISIN: INE634S01028
+Industry: Pharmaceuticals & Biotechnology
+Market Capitalization: 100,100.13 Cr
+Current Market Price: 2,425.15 (as of Oct 28, 2025)
+Price Change (1D): 0.42%
+Face Value: ₹1.0
+Company Size: Large Cap
+
+Equity Capital: ₹ 40.06 Crores
+Number of Shares: 40.06 Crores shares
+Book Value per Share: ₹347.37
+
+Company Address:
+N/A
+Email: N/A
+Website: N/A
+
+Company History:
+- Mankind Pharma Limited was incorporated on July 3, 1991, as a Private Limited Company with the name "Mankind Pharma Private Limited", by the Registrar of Companies, Delhi and Haryana, at New Delhi. Pursuant to conversion of Company to a Public Limited dated July 14, 2005, name of the Company was changed to "Mankind Pharma Limited" and the RoC issued a fresh Certificate of Incorporation on April 13, 2006.
+
+
+
+================================================================================
+
+================================================================================
+SECTION 2: QUARTERLY INCOME STATEMENT
+================================================================================
+
+All amounts in Rs. Crores
+================================================================================
+
+Quarter:            Jun'25      Mar'25      Dec'24      Sep'24      Jun'24      Mar'24      Dec'23      
+--------------------------------------------------------------------------------------------------------
+Net Sales:          3,570.35    3,079.37    3,198.79    3,076.51    2,867.85    2,422.24    2,606.95    
+QoQ Growth (%):     +15.94%     -3.73%      +3.97%      +7.28%      +18.40%     -7.09%      N/A         
+YoY Growth (%):     +24.50%     +27.13%     +22.70%     N/A         N/A         N/A         N/A         
+
+Employee Cost:      783.41      715.80      704.75      646.43      629.70      577.94      568.35      
+
+Operating Profit
+(PBDIT) excl OI:    846.77      683.19      815.99      850.04      671.56      586.30      606.50      
+Margin (%):         23.72%      22.19%      25.51%      27.63%      23.42%      24.2%       23.26%      
+
+Other Income:       79.88       251.33      77.00       109.43      99.40       92.15       70.13       
+
+Operating Profit
+(PBDIT):            926.65      934.52      892.99      959.47      770.96      678.45      676.63      
+
+Interest:           170.65      190.54      220.93      7.10        10.84       9.17        9.19        
+
+Depreciation:       218.68      230.87      187.17      105.62      102.69      99.78       109.72      
+
+Profit Before Tax:  540.49      515.43      488.33      849.32      661.34      571.91      562.32      
+
+Tax:                95.87       86.44       110.46      190.44      122.86      94.99       102.51      
+Tax Rate (%):       17.74%      16.77%      22.62%      22.42%      18.58%      16.61%      18.23%      
+
+Net Profit (PAT):   441.45      426.67      374.43      656.31      534.57      474.51      455.21      
+
+Consolidated Net
+Profit:             438.32      420.77      380.23      653.47      536.49      471.24      453.76      
+QoQ Growth (%):     +4.17%      +10.66%     -41.81%     +21.80%     +13.85%     +3.85%      N/A         
+YoY Growth (%):     -18.30%     -10.71%     -16.20%     N/A         N/A         N/A         N/A         
+
+Operating Margin
+(Excl OI) %:        23.72%      22.19%      25.51%      27.63%      23.42%      24.2%       23.26%      
+
+Gross Profit
+Margin %:           21.17%      24.16%      21.01%      30.96%      26.5%       27.63%      25.6%       
+
+PAT Margin %:       12.45%      13.93%      11.81%      21.42%      18.78%      19.69%      17.64%      
+
+
+================================================================================
+
+================================================================================
+SECTION 3: ANNUAL INCOME STATEMENT
+================================================================================
+
+All amounts in Rs. Crores
+================================================================================
+
+Year:               Mar'25      Mar'24      Mar'23      Mar'22      Mar'21      
+--------------------------------------------------------------------------------
+Net Sales:          12,207.00   10,260.00   8,749.00    7,781.00    6,214.00    
+YoY Growth (%):     +19.0%      +17.3%      +12.4%      +25.2%      N/A         
+
+Total Expenditure:  9,186.00    7,745.00    6,847.00    5,791.00    4,565.00    
+
+Employee Cost:      2,692.00    2,260.00    1,918.00    1,620.00    1,415.00    
+
+Operating Profit
+(PBDIT) excl OI:    3,020.00    2,515.00    1,901.00    1,990.00    1,649.00    
+Margin (%):         24.7%       24.5%       21.7%       25.6%       26.5%       
+
+Other Income:       536.00      280.00      128.00      196.00      170.00      
+
+Operating Profit
+(PBDIT):            3,557.00    2,795.00    2,030.00    2,186.00    1,820.00    
+
+Interest:           431.00      34.00       45.00       59.00       21.00       
+
+Depreciation:       621.00      378.00      325.00      166.00      118.00      
+
+Profit Before Tax:  2,516.00    2,397.00    1,671.00    1,974.00    1,691.00    
+
+Tax:                509.00      457.00      361.00      521.00      398.00      
+Tax Rate (%):       20.2%       19.1%       21.6%       26.4%       23.5%       
+
+Profit After Tax:   1,994.00    1,925.00    1,297.00    1,438.00    1,281.00    
+
+Operating Margin
+(Excl OI) %:        24.7%       24.5%       21.7%       25.6%       26.5%       
+
+Gross Margin %:     29.1%       27.2%       23.2%       28.1%       29.3%       
+
+PAT Margin %:       16.3%       18.8%       14.8%       18.5%       20.6%       
+
+
+================================================================================
+
+================================================================================
+SECTION 4: BALANCE SHEET
+================================================================================
+
+All amounts in Rs. Crores
+================================================================================
+
+Year:                     Mar'25      Mar'24      Mar'23      Mar'22      Mar'21      
+--------------------------------------------------------------------------------
+
+Share Capital:            41.26       40.06       40.06       40.06       40.06       
+Reserves & Surplus:       14,247.46   9,299.78    7,395.10    6,115.17    4,681.94    
+Shareholder Funds:        14,332.39   9,363.09    7,435.22    6,155.23    4,722.00    
+Long-Term Debt:           5,526.19    24.87       23.15       49.19       57.67       
+- Trade Payables:         1,133.40    777.06      1,008.18    1,076.38    666.97      
+- Other Current:          909.45      744.19      407.84      463.75      275.36      
+Current Liabilities:      5,663.56    2,119.73    1,863.14    2,623.47    1,353.40    
+ASSETS
+Fixed Assets:             18,837.23   4,420.89    4,130.92    3,515.41    1,604.58    
+Investments:              351.14      315.13      276.32      240.43      211.30      
+Current Assets:           6,988.27    6,568.22    4,327.87    4,406.82    3,906.64    
+
+
+================================================================================
+
+================================================================================
+SECTION 5: CASH FLOW STATEMENT
+================================================================================
+
+All amounts in Rs. Crores
+================================================================================
+
+Year:               Mar'25      Mar'24      Mar'23      Mar'22      Mar'21      Mar'20      
+--------------------------------------------------------------------------------
+Profit Before Tax:  2,524.00    2,399.00    1,671.00    1,974.00    1,691.00    1,437.00    
+Adjustments:        601.00      212.00      298.00      30.00       -5.00       108.00      
+Changes in WC:      -146.00     -17.00      166.00      -586.00     -94.00      -145.00     
+Cash Flow from
+Operations:         2,413.00    2,152.00    1,813.00    919.00      1,137.00    1,069.00    
+Cash Flow from
+Investing:          -12,624.00  -2,080.00   -1,051.00   -1,368.00   -1,221.00   -435.00     
+Cash Flow from
+Financing:          10,232.00   5.00        -739.00     604.00      -7.00       -530.00     
+Net Cash Inflow:    21.00       77.00       21.00       155.00      -92.00      103.00      
+Opening Cash:       382.00      304.00      283.00      127.00      219.00      116.00      
+Closing Cash:       403.00      382.00      304.00      283.00      127.00      219.00      
+
+
+================================================================================
+
+================================================================================
+SECTION 6: KEY FINANCIAL RATIOS & METRICS
+================================================================================
+
+
+
+PROFITABILITY RATIOS
+--------------------
+
+ROCE (avg)                          26.12%
+ROE (avg)                           17.21%
+
+
+GROWTH RATIOS
+-------------
+
+Sales Growth (5y)                   18.86%
+EBIT Growth (5y)                    17.94%
+
+
+LEVERAGE & SOLVENCY
+-------------------
+
+EBIT to Interest (avg)               37.24
+Debt to EBITDA (avg)                  0.70
+Net Debt to Equity (avg)             -0.16
+
+
+EFFICIENCY RATIOS
+-----------------
+
+Sales to Capital Employed (avg)       0.91
+
+
+VALUATION METRICS
+-----------------
+
+P/E Ratio                               53
+Industry P/E                            35
+Price to Book Value                   6.98
+EV to EBIT                           43.17
+EV to EBITDA                         33.14
+EV to Capital Employed                5.16
+EV to Sales                           8.19
+PEG Ratio                               NA
+Dividend Yield                       0.04%
+ROCE (Latest)                       11.19%
+ROE (Latest)                        14.78%
+
+
+OTHER METRICS
+-------------
+
+Tax Ratio                           20.19%
+Dividend Payout Ratio                  0.0
+Pledged Shares                         0.0
+Institutional Holding               24.76%
+
+
+
+================================================================================
+
+================================================================================
+SECTION 7: VALUATION METRICS (as of 28-Oct-2025, Price: Rs.2,425.15)
+================================================================================
+
+================================================================================
+
+VALUATION MULTIPLES:
+--------------------
+P/E Ratio (TTM):                      53x
+Price to Book Value (P/BV):           6.98x
+EV/EBITDA:                            33.14x
+EV/EBIT:                              43.17x
+EV/Sales:                             8.19x
+EV/Capital Employed:                  5.16x
+PEG Ratio:                            NAx
+
+DIVIDEND METRICS:
+-----------------
+Dividend Yield:                       0.04%
+Latest Dividend:                      Rs.1 per share
+Ex-Dividend Date:                     Aug-08-2025
+Dividend Payout:                      N/A
+
+VALUATION ASSESSMENT:
+---------------------
+Overall Valuation:                    VERY EXPENSIVE
+Valuation Grade History:
+- Changed to Very Expensive from Expensive: 13-Oct-25
+- Changed to Expensive from Very Expensive: 26-Sep-25
+- Changed to Very Expensive from Expensive: 01-Sep-25
+- Changed to Expensive from Very Expensive: 26-Aug-25
+- Changed to Very Expensive from Expensive: 21-Aug-25
+
+52-WEEK RANGE:
+--------------
+52-Week High:                         Rs.3,050.00
+52-Week Low:                          Rs.2,115.50
+Current Distance from High:           -20.49%
+Current Distance from Low:            +14.64%
+
+
+
+================================================================================
+
+================================================================================
+SECTION 8: SHAREHOLDING PATTERN (Last 5 Quarters)
+================================================================================
+
+
+Quarter:                Sep'25  Jun'25  Mar'25  Dec'24  Sep'24  
+--------------------------------------------------------------
+Promoter Holding:       72.67%  72.68%  72.70%  72.71%  74.87%  
+Change (QoQ):           -0.01%  -0.02%  -0.01%  -2.16%  N/A     
+
+FII Holding:            12.84%  13.07%  12.92%  13.35%  12.37%  
+Change (QoQ):           -0.23%  +0.15%  -0.43%  +0.98%  N/A     
+
+Mutual Fund Holding:    7.78%   7.34%   7.67%   7.97%   6.99%   
+Change (QoQ):           +0.44%  -0.33%  -0.30%  +0.98%  N/A     
+
+Insurance Holdings:     1.77%   2.24%   2.23%   2.28%   2.34%   
+Change (QoQ):           -0.47%  +0.01%  -0.05%  -0.06%  N/A     
+
+Other DII Holdings:     2.36%   1.92%   1.58%   0.77%   0.57%   
+Change (QoQ):           +0.44%  +0.34%  +0.81%  +0.20%  N/A     
+
+Non-Institutional:      2.57%   2.75%   2.90%   2.90%   2.86%   
+Change (QoQ):           -0.18%  -0.15%  0.00%   +0.04%  N/A     
+
+KEY PROMOTER DETAILS:
+---------------------
+Ramesh Juneja Family Trust (held In The Name Of Ramesh Juneja, Managing Trustee) 20.2%
+Rajeev Juneja Family Trust (held In The Name Of Rajeev Juneja, Managing Trustee) 19.37%
+Prem Sheetal Family Trust (held In The Name Of Arora Family Private Limited, Trustee) 14.96%
+Sheetal Arora                                 4.67%
+Puja Juneja                                   2.79%
+Poonam Juneja                                 2.56%
+Arjun Juneja                                  1.98%
+Ramesh Juneja                                 1.66%
+Rajeev Juneja                                 1.57%
+Chanakya Juneja                               0.94%
+Eklavya Juneja                                0.94%
+Mishka Arora                                  0.72%
+Ria Chopra Juneja                             0.31%
+
+INSTITUTIONAL ACTIVITY:
+-----------------------
+Number of FIIs:                      557
+Number of MFs:                       32
+Number of Insurance Companies:       N/A
+
+PROMOTER PLEDGING:
+------------------
+Pledged Shares:                      No pledging
+
+
+
+================================================================================
+
+================================================================================
+SECTION 9: STOCK PRICE & RETURNS ANALYSIS
+================================================================================
+
+
+CURRENT PRICE DATA (Oct 28, 09:41):
+---------------------------------
+Last Traded Price:                    ₹2425.15,
+Previous Close:                       ₹2,414.90
+Open:                                 ₹2,414.90
+Day's High:                           ₹2,425.15
+Day's Low:                            ₹2,397.05
+Volume Traded:                        704 shares
+Weighted Avg Price:                   ₹2,411.10
+
+MOVING AVERAGES:
+----------------
+5 Days MA:                            ₹2,437.09 (Stock BELOW)
+20 Days MA:                           ₹2,451.52 (Stock BELOW)
+50 Days MA:                           ₹2,511.68 (Stock BELOW)
+100 Days MA:                          ₹2,488.77 (Stock BELOW)
+200 Days MA:                          ₹2,470.84 (Stock BELOW)
+
+PRICE RETURNS:
+--------------
+Period          Stock Return    Sensex Return   Alpha
+------------------------------------------------------
+1 day           0.42%           0.19%           +0.23%
+1 week          -0.88%          0.61%           -1.49%
+1 month         -2.27%          5.62%           -7.89%
+3 month         -4.37%          5.01%           -9.38%
+6 month         -5.35%          5.89%           -11.24%
+YTD             -15.70%         8.71%           -24.41%
+1 year          -0.12%          6.17%           -6.29%
+2 years         38.17%          33.18%          +4.99%
+3 years         N/A             41.67%          N/A
+4 year          N/A             41.61%          N/A
+5 years         N/A             112.77%         N/A
+10 year         N/A             214.14%         N/A
+
+SECTOR COMPARISON:
+------------------
+1 Year Return (Mankind Pharma):       -0.12%
+Pharmaceuticals & Biotechnology Return:-2.42%
+Underperformance vs Sector:           2.30
+
+
+RISK-ADJUSTED RETURNS (1 Year):
+--------------------------------
+Stock Absolute Return:                -0.12%
+Risk-Adjusted Return:                 -0.00
+Volatility:                           30.43%
+Sharpe Ratio:                         Negative
+Risk Category:                        MEDIUM RISK LOW RETURN
+
+Sensex Absolute Return:               6.17%
+Sensex Risk-Adjusted Return:          0.49
+Sensex Volatility:                    12.52%
+
+BETA & RISK:
+------------
+Beta (Adjusted):                      1.00 (Medium Beta)
+Classification:                       Medium Beta Stock
+Interpretation:                       Generally rise and fall in line with the market
+
+
+
+================================================================================
+
+================================================================================
+SECTION 10: TECHNICAL ANALYSIS
+================================================================================
+
+================================================================================
+
+OVERALL TECHNICAL TREND:
+------------------------
+Current Trend:                                   MILDLY BULLISH
+Trend Changed:                                   23-Sep-2025 at ₹2560
+Previous Trend:                                  Bullish
+
+TECHNICAL INDICATOR SUMMARY:
+----------------------------
+Indicator               Weekly          Monthly
+-------------------------------------------------
+MACD:                   Mildly Bearish  
+RSI:                    No Signal       No Signal
+Bollinger Bands:        Bearish         Sideways
+Moving Averages:        Mildly Bullish  
+KST:                    Mildly Bearish  
+Dow Theory:             Mildly Bullish  Mildly Bullish
+OBV:                    No Trend        Bullish
+
+KEY TECHNICAL LEVELS:
+---------------------
+Immediate Support:                           ₹2,115.50 (52W Low)
+Immediate Resistance:                        ₹2,451.52 (20 DMA area)
+Major Resistance:                            ₹2,488.77 (100 DMA)
+Strong Resistance:                           ₹2,470.84 (200 DMA)
+52-Week High:                                ₹3,050.00 (Far resistance)
+
+TREND HISTORY:
+--------------
+23-Sep-25: Changed to Mildly Bullish from Bullish
+02-Sep-25: Changed to Bullish from Sideways
+01-Sep-25: Changed to Sideways from Mildly Bearish
+28-Aug-25: Changed to Mildly Bearish from Sideways
+26-Aug-25: Changed to Sideways from Mildly Bullish
+
+DELIVERY VOLUMES (Recent Trend):
+---------------------------------
+1-Month Delivery Change:                     17.9%
+1-Day Delivery Change:                       26.95% vs 5-day avg
+
+Trailing 1 Month: 27-Sep-25 To 27-Oct-25
+Previous 1 Month: 26-Aug-25 To 26-Sep-25
+
+Delivery Volume Summary:
+----------------------------------------------------------------------
+Period                    Volume               % of Total Volume   
+----------------------------------------------------------------------
+27-Oct-25                 1.74 lacs            70.33%          
+5 Day Avg                 1.37 lacs            55.60%          
+Trailing 1 Month Avg      1.87 lacs            58.98%          
+Previous 1 Month Avg      2.28 lacs            64.55%          
+
+
+
+================================================================================
+
+================================================================================
+SECTION 11: QUALITY ASSESSMENT
+================================================================================
+
+
+OVERALL QUALITY GRADE:
+----------------------
+Current Quality:                              GOOD
+Quality Status:                               Good quality company basis long term financial performance.
+
+Quality History:
+- Jul-2025 to Current:                  Good
+- Prior to Jun-2023:                  Does Not Qualify
+
+KEY QUALITY FACTORS:
+--------------------
+5-Year Sales Growth:                   18.86%
+5-Year EBIT Growth:                    17.94%
+Average EBIT to Interest:              37.24x (Strong)
+Average Debt to EBITDA:                0.70 (Low debt)
+Average Net Debt to Equity:            -0.16 (Net Cash Company)
+Average Sales to Capital Employed:     0.91x
+Tax Ratio:                             20.19%
+Dividend Payout Ratio:                 0.0
+Pledge Shares:                         0.0% (No pledging)
+Institutional Holdings:                24.76% (High)
+Average ROCE:                          26.12% (Strong)
+Average ROE:                           17.21% (Good)
+
+QUALITY INDICATORS:
+-------------------
+✓ Zero/Minimal Debt Company
+✓ Consistent profitability
+✓ Good ROCE (26%)
+✓ Strong interest coverage
+✓ Healthy long-term growth (Sales CAGR: 18.86%)
+✓ No promoter pledging
+✓ Healthy institutional participation
+✓ Strong balance sheet
+
+
+
+================================================================================
+
+================================================================================
+SECTION 12: FINANCIAL TREND ANALYSIS
+================================================================================
+
+
+
+SHORT-TERM FINANCIAL TREND:
+---------------------------
+Current Trend (Jun'25):                                 FLAT
+
+KEY POSITIVE FACTORS:
+---------------------
+✓ NET SALES(Latest six months):           At ₹6,649.72 Crores has Grown at 25.70%
+
+KEY NEGATIVE FACTORS:
+---------------------
+✗ INTEREST(9M)                            At ₹582.12 Crores has Grown at 2,047.25%
+✗ PAT (Quarterly)                         At ₹438.32 Crores has Fallen at -11.7% (vs previous 4Q average
+✗ Pbt Less Oi (Quarterly)                 At ₹460.61 Crores has Fallen at -6.5% (vs previous 4Q average
+
+TREND HISTORY:
+--------------
+Quarter     Trend          Date        Previous Trend
+----------------------------------------------------
+Jun'25      Flat           31-Jul-25   Negative
+Mar'24      Negative       22-May-25   Very Negative
+Dec'24      Very Negative  24-Jan-25   Positive
+
+
+
+================================================================================
+
+================================================================================
+SECTION 13: PROPRIETARY SCORE & ADVISORY
+================================================================================
+
+
+CURRENT ADVISORY (as of 28-Oct-2025):
+--------------------------------------
+Overall Score:                                58 / 100
+Advisory Rating:                              HOLD
+Recommendation:                               Not recommended for fresh buy
+                                              You can continue to hold
+
+Score Category:                               HOLD (Score 50-70)
+Previous Category:                            SELL on 8-Sep 2025 at ₹2578.60
+
+SCORE HISTORY:
+--------------
+Date            Score   Rating          Change From
+--------------------------------------------------------
+Current         58      Hold            -
+08-Sep-25       65      Hold            Sell→Hold
+01-Sep-25       48      Sell            Hold→Sell
+26-Aug-25       50      Hold            Sell→Hold
+21-Aug-25       48      Sell            Hold→Sell
+
+KEY STRENGTHS (Supporting the Score):
+--------------------------------------
+✓ High Management Efficiency with a high ROE of 17.21%
+✓ Strong ability to service debt as the company has a low Debt to EBITDA ratio of 0.69 times
+✓ Healthy long term growth as Net Sales has grown by an annual rate of 18.86% and Operating profit at 17.94%
+✓ High Institutional Holdings at 24.76%
+
+KEY CONCERNS (Limiting the Score):
+-----------------------------------
+✗ Flat financial performance in recent quarter
+✗ Flat results in Jun 25
+
+MOJO 4 DOTS ANALYSIS:
+---------------------
+1. NEAR TERM DRIVERS:                         NEUTRAL
+   - Quarterly Financial Trend:       Flat 
+   - Technicals:                      Mildly Bullish ✓
+
+2. QUALITY:                                   GOOD ✓
+   - Good quality fundamentals
+
+3. VALUATION:                                 VERY EXPENSIVE 
+   - Trading at premium valuation
+
+4. Overall Assessment:                        CAUTIOUS
+   - Mixed signals across parameters
+
+
+
+================================================================================
+
+================================================================================
+SECTION 14: PEER COMPARISON
+================================================================================
+
+
+PEER GROUP - PHARMACEUTICALS & BIOTECHNOLOGY:
+---------------------------------------------
+Company             PE(TTM)     Div Yield   Return on Equity  Debt to Equity  Price to Book
+-----------------------------------------------------------------------------------------------
+Mankind Pharma       52.70           0.04%           17.21%            -0.16           6.98
+Divi's Lab.          74.62           0.46%           17.46%            -0.25          11.49
+Cipla                23.74             NA%           14.25%            -0.25           4.10
+Torrent Pharma       60.31           0.72%           22.28%             0.33          16.05
+Dr Reddy's Labs      18.57           0.62%           12.90%            -0.03           0.30
+Zydus Lifesci.       21.52           1.09%           19.49%            -0.19           4.26
+
+RELATIVE POSITIONING:
+---------------------
+Mankind Pharma vs Peers:
+- Lower ROE (17.2% vs peer avg ~17%)
+- Lower P/BV (6.98x vs peer avg ~7.2x)
+- Higher PE (52.70x vs peer avg ~40x)
+- Lower Dividend Yield (0.04% vs peer avg ~1%)
+
+KEY OBSERVATIONS:
+-----------------
+✓ Mankind Pharma has ROE of 17.2%
+✓ Mankind Pharma PE at elevated 52.70x
+
+MARKET CAP RANKING:
+-------------------
+Mankind Pharma Market Cap:       ₹100,100 Crores
+Position:             #6 among peer group
+
+
+
+================================================================================
+
+
+Report generated on: 28-Oct-2025 09:43:24
