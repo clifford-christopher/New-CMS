@@ -12,7 +12,9 @@ import CharacterCounter from './CharacterCounter';
 import PlaceholderDocumentation from './PlaceholderDocumentation';
 import ValidationSummary from './ValidationSummary';
 import PreviewModal from './PreviewModal';
+import UndoRedoButtons from './UndoRedoButtons';
 import { getAvailablePlaceholders } from '@/lib/placeholderUtils';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 interface PromptEditorProps {
   triggerId: string;
@@ -27,7 +29,9 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
     isSaving,
     saveError,
     loadPrompts,
-    savePrompts
+    savePrompts,
+    undo,
+    redo
   } = usePrompt();
 
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -39,6 +43,12 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<any[]>([]);
+
+  // Setup keyboard shortcuts for undo/redo
+  useKeyboardShortcuts({
+    undo: () => undo(activeTab),
+    redo: () => redo(activeTab)
+  });
 
   // Load prompts on mount
   useEffect(() => {
@@ -223,6 +233,7 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
                 Saved {formatLastSaved(currentPrompt.lastSaved)}
               </small>
             )}
+            <UndoRedoButtons />
             <Button
               variant="outline-secondary"
               size="sm"

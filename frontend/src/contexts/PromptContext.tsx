@@ -1,8 +1,23 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 
 type PromptType = 'paid' | 'unpaid' | 'crawler';
+
+interface VersionEntry {
+  id: string;
+  timestamp: Date;
+  template: string;
+  characterCount: number;
+  wordCount: number;
+  isManualCheckpoint: boolean;
+}
+
+interface PromptHistory {
+  versions: VersionEntry[];
+  currentIndex: number;
+  pendingChanges: boolean;
+}
 
 interface PromptTemplate {
   content: string;
@@ -16,6 +31,10 @@ interface PromptContextType {
   activeTab: PromptType;
   checkedTypes: Set<PromptType>;
   editorTheme: 'vs-light' | 'vs-dark';
+  canUndo: (type: PromptType) => boolean;
+  canRedo: (type: PromptType) => boolean;
+  undo: (type: PromptType) => void;
+  redo: (type: PromptType) => void;
   setPromptContent: (type: PromptType, content: string) => void;
   setActiveTab: (type: PromptType) => void;
   setCheckedTypes: (types: Set<PromptType>) => void;
@@ -28,10 +47,64 @@ interface PromptContextType {
 
 const PromptContext = createContext<PromptContextType | undefined>(undefined);
 
+const HISTORY_KEY_PREFIX = 'promptHistory_';
+const MAX_VERSIONS = 10;
+
 const calculateStats = (content: string) => {
   const characterCount = content.length;
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   return { characterCount, wordCount };
+};
+
+const createVersionEntry = (template: string, isCheckpoint: boolean = false): VersionEntry => {
+  const stats = calculateStats(template);
+  return {
+    id: `v_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date(),
+    template,
+    characterCount: stats.characterCount,
+    wordCount: stats.wordCount,
+    isManualCheckpoint: isCheckpoint
+  };
+};
+
+const loadHistoryFromStorage = (type: PromptType): PromptHistory => {
+  try {
+    const stored = sessionStorage.getItem(`${HISTORY_KEY_PREFIX}${type}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        versions: parsed.versions.map((v: any) => ({
+          ...v,
+          timestamp: new Date(v.timestamp)
+        })),
+        currentIndex: parsed.currentIndex,
+        pendingChanges: false
+      };
+    }
+  } catch (err) {
+    console.warn(`Failed to load history for ${type}:`, err);
+  }
+
+  return {
+    versions: [],
+    currentIndex: -1,
+    pendingChanges: false
+  };
+};
+
+const saveHistoryToStorage = (type: PromptType, history: PromptHistory) => {
+  try {
+    sessionStorage.setItem(
+      `${HISTORY_KEY_PREFIX}${type}`,
+      JSON.stringify({
+        versions: history.versions,
+        currentIndex: history.currentIndex
+      })
+    );
+  } catch (err) {
+    console.warn(`Failed to save history for ${type}:`, err);
+  }
 };
 
 export function PromptProvider({ children }: { children: ReactNode }) {
@@ -48,6 +121,14 @@ export function PromptProvider({ children }: { children: ReactNode }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [triggerId, setTriggerId] = useState<string | null>(null);
 
+  // Initialize history from sessionStorage
+  const [history, setHistory] = useState<Record<PromptType, PromptHistory>>({
+    paid: loadHistoryFromStorage('paid'),
+    unpaid: loadHistoryFromStorage('unpaid'),
+    crawler: loadHistoryFromStorage('crawler')
+  });
+
+
   // Load theme from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('editor-theme') as 'vs-light' | 'vs-dark' | null;
@@ -60,13 +141,133 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+
   const setEditorTheme = (theme: 'vs-light' | 'vs-dark') => {
     setEditorThemeState(theme);
     localStorage.setItem('editor-theme', theme);
   };
 
+  // Version history functions
+  const canUndo = useCallback((type: PromptType) => history[type].currentIndex > 0, [history]);
+
+  const canRedo = useCallback(
+    (type: PromptType) => history[type].currentIndex < history[type].versions.length - 1,
+    [history]
+  );
+
+  const undo = useCallback((type: PromptType) => {
+    if (!canUndo(type)) return;
+
+    setHistory(prev => {
+      const newHistory = { ...prev };
+      const typeHistory = { ...newHistory[type] };
+      typeHistory.currentIndex--;
+
+      const version = typeHistory.versions[typeHistory.currentIndex];
+      if (version) {
+        setPrompts(p => ({
+          ...p,
+          [type]: {
+            ...p[type],
+            content: version.template,
+            ...calculateStats(version.template)
+          }
+        }));
+      }
+
+      typeHistory.pendingChanges = false;
+      newHistory[type] = typeHistory;
+      saveHistoryToStorage(type, typeHistory);
+      return newHistory;
+    });
+  }, [canUndo]);
+
+  const redo = useCallback((type: PromptType) => {
+    if (!canRedo(type)) return;
+
+    setHistory(prev => {
+      const newHistory = { ...prev };
+      const typeHistory = { ...newHistory[type] };
+      typeHistory.currentIndex++;
+
+      const version = typeHistory.versions[typeHistory.currentIndex];
+      if (version) {
+        setPrompts(p => ({
+          ...p,
+          [type]: {
+            ...p[type],
+            content: version.template,
+            ...calculateStats(version.template)
+          }
+        }));
+      }
+
+      typeHistory.pendingChanges = false;
+      newHistory[type] = typeHistory;
+      saveHistoryToStorage(type, typeHistory);
+      return newHistory;
+    });
+  }, [canRedo]);
+
+  const saveAsVersion = useCallback((type: PromptType, isCheckpoint: boolean = false) => {
+    const currentContent = prompts[type].content;
+    const newVersion = createVersionEntry(currentContent, isCheckpoint);
+
+    setHistory(prev => {
+      const newHistory = { ...prev };
+      const typeHistory = { ...newHistory[type] };
+
+      // If not at the end, discard future history
+      if (typeHistory.currentIndex < typeHistory.versions.length - 1) {
+        typeHistory.versions = typeHistory.versions.slice(0, typeHistory.currentIndex + 1);
+      }
+
+      // Add new version
+      typeHistory.versions.push(newVersion);
+      typeHistory.currentIndex = typeHistory.versions.length - 1;
+
+      // Keep only last 10 versions (FIFO)
+      if (typeHistory.versions.length > MAX_VERSIONS) {
+        typeHistory.versions = typeHistory.versions.slice(-MAX_VERSIONS);
+        typeHistory.currentIndex = typeHistory.versions.length - 1;
+      }
+
+      typeHistory.pendingChanges = false;
+
+      newHistory[type] = typeHistory;
+      saveHistoryToStorage(type, typeHistory);
+      return newHistory;
+    });
+  }, [prompts]);
+
+  const loadVersion = useCallback((type: PromptType, versionIndex: number) => {
+    const version = history[type].versions[versionIndex];
+    if (!version) return;
+
+    setPrompts(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        content: version.template,
+        ...calculateStats(version.template)
+      }
+    }));
+
+    setHistory(prev => {
+      const newHistory = { ...prev };
+      const typeHistory = { ...newHistory[type] };
+      typeHistory.currentIndex = versionIndex;
+      typeHistory.pendingChanges = false;
+      newHistory[type] = typeHistory;
+      saveHistoryToStorage(type, typeHistory);
+      return newHistory;
+    });
+  }, [history]);
+
   const setPromptContent = (type: PromptType, content: string) => {
     const stats = calculateStats(content);
+    const currentContent = prompts[type].content;
+
     setPrompts(prev => ({
       ...prev,
       [type]: {
@@ -75,6 +276,36 @@ export function PromptProvider({ children }: { children: ReactNode }) {
         ...stats
       }
     }));
+
+    // Only create a new version if content actually changed and we're at the current version
+    if (content !== currentContent) {
+      setHistory(prev => {
+        const newHistory = { ...prev };
+        const typeHistory = { ...newHistory[type] };
+
+        // If not at the end, discard future history
+        if (typeHistory.currentIndex < typeHistory.versions.length - 1) {
+          typeHistory.versions = typeHistory.versions.slice(0, typeHistory.currentIndex + 1);
+        }
+
+        // Create and add new version
+        const newVersion = createVersionEntry(content, false);
+        typeHistory.versions.push(newVersion);
+        typeHistory.currentIndex = typeHistory.versions.length - 1;
+
+        // Keep only last 10 versions (FIFO)
+        if (typeHistory.versions.length > MAX_VERSIONS) {
+          typeHistory.versions = typeHistory.versions.slice(-MAX_VERSIONS);
+          typeHistory.currentIndex = typeHistory.versions.length - 1;
+        }
+
+        typeHistory.pendingChanges = false;
+
+        newHistory[type] = typeHistory;
+        saveHistoryToStorage(type, typeHistory);
+        return newHistory;
+      });
+    }
   };
 
   const savePrompts = async (tid: string) => {
@@ -171,6 +402,10 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     activeTab,
     checkedTypes,
     editorTheme,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
     setPromptContent,
     setActiveTab,
     setCheckedTypes,

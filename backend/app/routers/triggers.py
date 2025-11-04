@@ -568,3 +568,129 @@ async def save_prompt_drafts(trigger_name: str, prompts_data: dict):
     except Exception as e:
         logger.error(f"Failed to save prompt drafts for trigger '{trigger_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update prompts: {str(e)}")
+
+
+@router.get("/{trigger_name}/config/prompts/versions")
+async def get_prompt_versions(trigger_name: str):
+    """
+    Get list of all saved prompt versions for a trigger.
+
+    Returns version metadata including version number, timestamp, and author
+    for all saved drafts of the specified trigger.
+
+    Args:
+        trigger_name: Trigger identifier
+
+    Returns:
+        dict: Contains 'versions' array and 'total' count
+
+    Raises:
+        HTTPException: 503 if database not connected, 500 on other errors
+    """
+    try:
+        db = get_database()
+
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
+        # Find all drafts for this trigger, sorted by version (newest first)
+        drafts_cursor = db.trigger_prompt_drafts.find(
+            {"trigger_name": trigger_name}
+        ).sort("version", -1)
+
+        drafts = await drafts_cursor.to_list(length=100)
+
+        # Extract version metadata
+        versions = [
+            {
+                "version": d["version"],
+                "saved_at": d["saved_at"].isoformat() if hasattr(d.get("saved_at"), "isoformat") else str(d.get("saved_at", "")),
+                "saved_by": d.get("saved_by", "unknown"),
+                "is_draft": d.get("is_draft", True),
+                "prompt_types": list(d.get("prompts", {}).keys())
+            }
+            for d in drafts
+        ]
+
+        return {
+            "versions": versions,
+            "total": len(versions),
+            "trigger_name": trigger_name
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retrieve prompt versions for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve versions: {str(e)}")
+
+
+@router.get("/{trigger_name}/config/prompts/version/{version_number}")
+async def get_prompt_version(trigger_name: str, version_number: int):
+    """
+    Get specific version of prompts for preview.
+
+    Retrieves the complete prompt data for a specific version number,
+    allowing users to preview or restore historical versions.
+
+    Args:
+        trigger_name: Trigger identifier
+        version_number: Version number to retrieve
+
+    Returns:
+        dict: Complete prompt data for the specified version including all prompt types
+
+    Raises:
+        HTTPException: 404 if version not found, 503 if database not connected, 500 on other errors
+    """
+    try:
+        db = get_database()
+
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
+        # Find specific version
+        draft = await db.trigger_prompt_drafts.find_one({
+            "trigger_name": trigger_name,
+            "version": version_number
+        })
+
+        if not draft:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Version {version_number} not found for trigger '{trigger_name}'"
+            )
+
+        # Remove MongoDB _id field
+        draft.pop("_id", None)
+
+        # Format the response similar to get_trigger_config
+        prompts = {}
+        draft_prompts = draft.get("prompts", {})
+
+        for prompt_type in ["paid", "unpaid", "crawler"]:
+            if prompt_type in draft_prompts:
+                prompt_data = draft_prompts[prompt_type]
+                prompts[prompt_type] = {
+                    "template": prompt_data.get("template", ""),
+                    "character_count": prompt_data.get("character_count", 0),
+                    "word_count": prompt_data.get("word_count", 0),
+                    "last_saved": draft.get("saved_at"),
+                    "version": draft.get("version"),
+                    "is_draft": True
+                }
+
+        return {
+            "trigger_name": trigger_name,
+            "version": draft.get("version"),
+            "saved_at": draft.get("saved_at").isoformat() if hasattr(draft.get("saved_at"), "isoformat") else str(draft.get("saved_at", "")),
+            "saved_by": draft.get("saved_by", "unknown"),
+            "prompts": prompts,
+            "is_draft": draft.get("is_draft", True)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retrieve version {version_number} for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve version: {str(e)}")

@@ -24,6 +24,8 @@ The News CMS will transform this process by providing a visual, interactive inte
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
+| 2025-11-04 | 1.2 | Updated completion status for Stories 1.1-1.4, 2.1, 2.3, 2.5, 3.1-3.4, 3.4b | Claude |
+| 2025-11-04 | 1.1 | Added Story 3.4b: Version Selection in Preview (completed) | Claude |
 | 2025-10-24 | 1.0 | Initial PRD created from project brief | John (PM Agent) |
 
 ## Requirements
@@ -416,68 +418,68 @@ Enable publishing of tested configurations to production with validation, audit 
 
 **Goal**: Establish the technical foundation for the News CMS including project structure, core infrastructure (FastAPI backend, Next.js frontend, MongoDB database), basic UI shell, and trigger management. This epic delivers a deployable "walking skeleton" that allows users to view and select news triggers—providing immediate value while establishing the architecture for all subsequent features. Authentication is handled via cookies from the existing authentication system.
 
-### Story 1.1: Project Setup and Monorepo Structure
+### Story 1.1: Project Setup and Monorepo Structure ✅ COMPLETED
 
 **As a** developer,
 **I want** a properly configured monorepo with frontend and backend projects,
 **so that** the team can develop both applications with consistent tooling and shared dependencies.
 
 **Acceptance Criteria**:
-1. Monorepo created with `frontend/` (Next.js + TypeScript) and `backend/` (Python/FastAPI) directories
-2. Frontend package.json configured with Next.js 14+, TypeScript, React-Bootstrap, and Monaco Editor dependencies
-3. Backend pyproject.toml or requirements.txt configured with FastAPI, Pydantic v2, Motor (MongoDB async driver), and pytest
-4. Shared schemas directory created with example Pydantic model exported for use by both frontend and backend
-5. Root-level README.md documents project structure, local development setup instructions, and technology stack
-6. Git repository initialized with appropriate .gitignore files for Node.js and Python
-7. Both frontend and backend applications start successfully in local development mode (npm run dev, uvicorn)
+1. ✅ Monorepo created with `frontend/` (Next.js + TypeScript) and `backend/` (Python/FastAPI) directories
+2. ✅ Frontend package.json configured with Next.js 14+, TypeScript, React-Bootstrap, and Monaco Editor dependencies
+3. ✅ Backend pyproject.toml or requirements.txt configured with FastAPI, Pydantic v2, Motor (MongoDB async driver), and pytest
+4. ✅ Shared schemas directory created with example Pydantic model exported for use by both frontend and backend
+5. ✅ Root-level README.md documents project structure, local development setup instructions, and technology stack
+6. ✅ Git repository initialized with appropriate .gitignore files for Node.js and Python
+7. ✅ Both frontend and backend applications start successfully in local development mode (npm run dev, uvicorn)
 
-### Story 1.2: MongoDB Database Setup and Connection
+### Story 1.2: MongoDB Database Setup and Connection ✅ COMPLETED
 
 **As a** developer,
 **I want** MongoDB database connectivity configured with initial collections,
 **so that** the application can persist triggers, configurations, and audit data.
 
 **Acceptance Criteria**:
-1. MongoDB Community Edition installed locally or MongoDB Atlas connection configured
-2. Pydantic models created for core collections: Trigger, Configuration, User, AuditLog
-3. FastAPI backend establishes async connection to MongoDB using Motor driver on startup
-4. Database connection health check endpoint `/api/health` returns MongoDB connection status
-5. Migration script (or documentation) creates initial collections with appropriate indexes (e.g., trigger_id, user_id, created_at)
-6. Sample seed data script populates database with 3-5 example triggers for development testing
-7. Environment variable configuration for MongoDB connection string (supports local and cloud deployments)
-8. Graceful error handling and logging if MongoDB connection fails
+1. ✅ MongoDB Community Edition installed locally or MongoDB Atlas connection configured
+2. ✅ Pydantic models created for core collections: Trigger, Configuration, User, AuditLog
+3. ✅ FastAPI backend establishes async connection to MongoDB using Motor driver on startup
+4. ✅ Database connection health check endpoint `/api/health` returns MongoDB connection status
+5. ✅ Migration script (or documentation) creates initial collections with appropriate indexes (e.g., trigger_id, user_id, created_at)
+6. ✅ Sample seed data script populates database with 3-5 example triggers for development testing
+7. ✅ Environment variable configuration for MongoDB connection string (supports local and cloud deployments)
+8. ✅ Graceful error handling and logging if MongoDB connection fails
 
-### Story 1.3: Basic UI Shell and Navigation
+### Story 1.3: Basic UI Shell and Navigation ✅ COMPLETED
 
 **As a** content manager,
 **I want** a professional, navigable UI shell with Bootstrap styling,
 **so that** I can access different areas of the CMS intuitively.
 
 **Acceptance Criteria**:
-1. Next.js App Router layout created with Bootstrap 5 CSS imported globally
-2. Responsive navigation bar using React-Bootstrap Navbar component with logo placeholder
-3. Navigation includes links to: Dashboard (Triggers), Configuration Workspace (disabled until trigger selected), Settings (placeholder)
-4. Footer displays application name and version
-5. Application meets NFR6: Responsive design with 1200px+ desktop layout and 768px+ tablet layout
-6. All pages use consistent Bootstrap grid system and spacing utilities
-7. Basic loading spinner component created for future async operations
+1. ✅ Next.js App Router layout created with Bootstrap 5 CSS imported globally
+2. ✅ Responsive navigation bar using React-Bootstrap Navbar component with logo placeholder
+3. ✅ Navigation includes links to: Dashboard (Triggers), Configuration Workspace (disabled until trigger selected), Settings (placeholder)
+4. ✅ Footer displays application name and version
+5. ✅ Application meets NFR6: Responsive design with 1200px+ desktop layout and 768px+ tablet layout
+6. ✅ All pages use consistent Bootstrap grid system and spacing utilities
+7. ✅ Basic loading spinner component created for future async operations
 
-### Story 1.4: Trigger Management Dashboard
+### Story 1.4: Trigger Management Dashboard ✅ COMPLETED
 
 **As a** content manager,
 **I want** to view a list of available news triggers with status information,
 **so that** I can select a trigger to configure.
 
 **Acceptance Criteria**:
-1. FastAPI endpoint `GET /api/triggers` returns list of all triggers from MongoDB (name, description, status, last_updated)
-2. Frontend Dashboard page fetches and displays triggers in Bootstrap Table or Card grid
-3. Each trigger shows: name, description, configuration status (Configured/Unconfigured), last updated timestamp
-4. Visual status indicator (badge or icon) distinguishes configured vs. unconfigured triggers
-5. Clicking a trigger navigates to Configuration Workspace with trigger ID in URL (`/config/:triggerId`)
-6. Empty state displayed if no triggers exist (with message suggesting database seeding)
-7. Loading state displayed while fetching triggers from API
-8. Error handling displays user-friendly message if API call fails
-9. Meets NFR1: Page loads in under 2 seconds with 10+ triggers
+1. ✅ FastAPI endpoint `GET /api/triggers` returns list of all triggers from MongoDB (name, description, status, last_updated)
+2. ✅ Frontend Dashboard page fetches and displays triggers in Bootstrap Table or Card grid
+3. ✅ Each trigger shows: name, description, configuration status (Configured/Unconfigured), last updated timestamp
+4. ✅ Visual status indicator (badge or icon) distinguishes configured vs. unconfigured triggers
+5. ✅ Clicking a trigger navigates to Configuration Workspace with trigger ID in URL (`/config/:triggerId`)
+6. ✅ Empty state displayed if no triggers exist (with message suggesting database seeding)
+7. ✅ Loading state displayed while fetching triggers from API
+8. ✅ Error handling displays user-friendly message if API call fails
+9. ✅ Meets NFR1: Page loads in under 2 seconds with 10+ triggers
 
 ### Story 1.5: AWS Deployment Setup for Staging Environment
 
@@ -503,22 +505,22 @@ Enable publishing of tested configurations to production with validation, audit 
 
 **Goal**: Build the complete data retrieval and transformation pipeline that connects to external data APIs, executes parser scripts, and displays structured data. This epic enables content managers to configure which data sources feed into news generation and preview the actual data that will be used in prompts—addressing the critical pain point of "no visibility into data." **Note**: Data configuration is shared across all three prompt types (paid, unpaid, crawler) for consistency and efficiency.
 
-### Story 2.1: API Configuration Interface
+### Story 2.1: API Configuration Interface ✅ COMPLETED
 
 **As a** content manager,
 **I want** to add and remove data APIs from a trigger's configuration,
 **so that** I can control which data sources are used for news generation.
 
 **Acceptance Criteria**:
-1. Configuration Workspace page loads trigger details from `GET /api/triggers/:id/config` (includes currently configured APIs)
-2. "Data Sources" panel displays list of currently configured APIs with remove button for each
-3. "Add API" dropdown or modal shows predefined list of available data APIs (from backend registry or database)
-4. Clicking "Add API" sends `POST /api/triggers/:id/config/apis` with API identifier, updates UI optimistically
-5. Clicking "Remove" button sends `DELETE /api/triggers/:id/config/apis/:apiId`, updates UI
-6. Backend validates that required APIs are present before allowing removal (FR5)
-7. Changes auto-save to MongoDB Configuration collection
-8. Toast notification confirms successful add/remove operations
-9. Error handling prevents adding duplicate APIs and displays clear error message
+1. ✅ Configuration Workspace page loads trigger details from `GET /api/triggers/:id/config` (includes currently configured APIs)
+2. ✅ "Data Sources" panel displays list of currently configured APIs with remove button for each
+3. ✅ "Add API" dropdown or modal shows predefined list of available data APIs (from backend registry or database)
+4. ✅ Clicking "Add API" sends `POST /api/triggers/:id/config/apis` with API identifier, updates UI optimistically
+5. ✅ Clicking "Remove" button sends `DELETE /api/triggers/:id/config/apis/:apiId`, updates UI
+6. ✅ Backend validates that required APIs are present before allowing removal (FR5)
+7. ✅ Changes auto-save to MongoDB Configuration collection
+8. ✅ Toast notification confirms successful add/remove operations
+9. ✅ Error handling prevents adding duplicate APIs and displays clear error message
 
 ### Story 2.2: Data API Integration Layer
 
@@ -537,23 +539,23 @@ Enable publishing of tested configurations to production with validation, audit 
 8. Unit tests for adapter logic with mocked HTTP responses (using httpx Mock or responses library)
 9. Integration tests against sandbox/test endpoints or mocked APIs validate error handling (404, 500, timeout)
 
-### Story 2.3: Data Retrieval and Raw JSON Display
+### Story 2.3: Data Retrieval and Raw JSON Display ✅ COMPLETED
 
 **As a** content manager,
 **I want** to fetch and view raw JSON data from configured APIs for a specific stock,
 **so that** I understand exactly what data is being retrieved.
 
 **Acceptance Criteria**:
-1. Configuration Workspace includes stock ID input field with "Fetch Data" button
-2. Backend endpoint `POST /api/triggers/:id/data/fetch` accepts stock ID and returns raw JSON from all configured APIs
-3. Frontend displays loading indicator during data fetch (meets NFR2: completes within 5 seconds per API)
-4. Raw JSON displayed in collapsible panels (one per API) with syntax highlighting (JSON formatting)
-5. Each API panel shows: API name, fetch status (success/failure), latency, timestamp
-6. Failed API calls display error message (timeout, 404, 500) without blocking other APIs
-7. Success state shows formatted JSON with expand/collapse capability for nested objects
-8. "Refresh Data" button allows re-fetching without re-entering stock ID
-9. Stock ID validation checks format before allowing fetch (prevents invalid requests)
-10. Meets FR6 and FR7: organized display with status indicators
+1. ✅ Configuration Workspace includes stock ID input field with "Fetch Data" button
+2. ✅ Backend endpoint `POST /api/triggers/:id/data/fetch` accepts stock ID and returns raw JSON from all configured APIs
+3. ✅ Frontend displays loading indicator during data fetch (meets NFR2: completes within 5 seconds per API)
+4. ✅ Raw JSON displayed in collapsible panels (one per API) with syntax highlighting (JSON formatting)
+5. ✅ Each API panel shows: API name, fetch status (success/failure), latency, timestamp
+6. ✅ Failed API calls display error message (timeout, 404, 500) without blocking other APIs
+7. ✅ Success state shows formatted JSON with expand/collapse capability for nested objects
+8. ✅ "Refresh Data" button allows re-fetching without re-entering stock ID
+9. ✅ Stock ID validation checks format before allowing fetch (prevents invalid requests)
+10. ✅ Meets FR6 and FR7: organized display with status indicators
 
 ### Story 2.4: Parser Integration and Execution
 
@@ -572,103 +574,140 @@ Enable publishing of tested configurations to production with validation, audit 
 8. Unit tests validate parser execution with sample JSON inputs and expected outputs
 9. Integration tests cover error scenarios: malformed JSON, missing required fields, parser script failures
 
-### Story 2.5: Structured Data Display and Section Preview
+### Story 2.5: Structured Data Display and Section Preview ✅ COMPLETED
 
 **As a** content manager,
 **I want** to view the structured data output from parsers with clear section labels,
 **so that** I can verify the data is correctly organized before writing prompts.
 
 **Acceptance Criteria**:
-1. After parsing, "Structured Data" panel displays sections returned by parser
-2. Each section displayed in separate Bootstrap Card with section name as header
-3. Section content formatted appropriately (paragraphs, bullet lists, tables based on data structure)
-4. Collapsible sections allow focusing on specific data areas
-5. Visual mapping indicator shows which raw API data contributed to each section (e.g., "Source: Earnings API")
-6. Sections numbered or labeled to support referencing in prompts
-7. Empty sections (no data available) display placeholder message rather than blank space
-8. "Preview Final Data Structure" button shows JSON representation of complete structured data as it will be passed to LLM
-9. Meets FR9: clear section labels and mapping between raw and structured data
-10. Data persists in UI state (React Context) for use in prompt editing without re-fetching
+1. ✅ After parsing, "Structured Data" panel displays sections returned by parser
+2. ✅ Each section displayed in separate Bootstrap Card with section name as header
+3. ✅ Section content formatted appropriately (paragraphs, bullet lists, tables based on data structure)
+4. ✅ Collapsible sections allow focusing on specific data areas
+5. ✅ Visual mapping indicator shows which raw API data contributed to each section (e.g., "Source: Earnings API")
+6. ✅ Sections numbered or labeled to support referencing in prompts
+7. ✅ Empty sections (no data available) display placeholder message rather than blank space
+8. ✅ "Preview Final Data Structure" button shows JSON representation of complete structured data as it will be passed to LLM
+9. ✅ Meets FR9: clear section labels and mapping between raw and structured data
+10. ✅ Data persists in UI state (React Context) for use in prompt editing without re-fetching
 
 ## Epic 3: Prompt Engineering Workspace
 
 **Goal**: Create the prompt editing environment where content managers craft and refine prompts using real data. This epic delivers the core creative workspace with section management, tabbed prompt editor for multiple types (paid, unpaid, crawler), syntax-highlighted editing, real-time validation, and preview capabilities—enabling rapid prompt iteration without developer dependency. **Note**: Section management is shared across all prompt types, but each type has its own independent prompt template accessible via tabs.
 
-### Story 3.1: Section Reordering Interface (Shared Across All Prompt Types)
+**Stories**: ✅ 3.1 (COMPLETED), ✅ 3.2 (COMPLETED), ✅ 3.3 (COMPLETED), ✅ 3.4 (COMPLETED), ✅ 3.4b (COMPLETED 2025-11-04), 3.5 (In Progress)
+
+**Status**: Stories 3.1-3.4b completed - full prompt workspace with section reordering, Monaco editor integration with syntax highlighting and validation, preview with data substitution, and version selection. Story 3.5 (Version History UI) partially complete (backend done, frontend UI pending).
+
+### Story 3.1: Section Reordering Interface (Shared Across All Prompt Types) ✅ COMPLETED
 
 **As a** content manager,
 **I want** to reorder data sections via drag-and-drop or numbered input,
 **so that** I can control the sequence in which data appears in all prompt types (paid, unpaid, crawler).
 
 **Acceptance Criteria**:
-1. "Section Order" panel displays structured data sections in current order
-2. Drag-and-drop functionality implemented using React DnD library or Bootstrap Sortable
-3. Alternative numbered input allows typing new position (e.g., move section 3 to position 1)
-4. Section order changes immediately reflected in UI without page reload
-5. "Preview Data Structure" updates to show new section order in final JSON
-6. Section order saved to Configuration in MongoDB when changed (auto-save or explicit save button)
-7. Meets FR11 and FR12: reordering capability with preview of effects
-8. Undo/redo support for section order changes (single-level undo sufficient for MVP)
-9. Visual feedback during drag operation (highlighting drop zones)
+1. ✅ "Section Order" panel displays structured data sections in current order
+2. ✅ Drag-and-drop functionality implemented using React DnD library or Bootstrap Sortable
+3. ✅ Alternative numbered input allows typing new position (e.g., move section 3 to position 1)
+4. ✅ Section order changes immediately reflected in UI without page reload
+5. ✅ "Preview Data Structure" updates to show new section order in final JSON
+6. ✅ Section order saved to Configuration in MongoDB when changed (auto-save or explicit save button)
+7. ✅ Meets FR11 and FR12: reordering capability with preview of effects
+8. ✅ Undo/redo support for section order changes (single-level undo sufficient for MVP)
+9. ✅ Visual feedback during drag operation (highlighting drop zones)
 
-### Story 3.2: Tabbed Prompt Editor with Syntax Highlighting
+### Story 3.2: Tabbed Prompt Editor with Syntax Highlighting ✅ COMPLETED
 
 **As a** content manager,
 **I want** a tabbed full-featured text editor for crafting prompts for each type (paid, unpaid, crawler) with syntax highlighting,
 **so that** I can write complex prompts comfortably for different audiences and see placeholder references clearly.
 
 **Acceptance Criteria**:
-1. Monaco Editor component integrated into Configuration Workspace with tabbed interface
-2. Tabs displayed horizontally: [Paid] [Unpaid] [Crawler] - showing only checked prompt types from Trigger Context Bar
-3. Active tab highlighted with blue underline, inactive tabs shown in gray
-4. Clicking a tab switches the editor content to that prompt type's template
-5. Each prompt type maintains its own template, independent of other types
-6. Prompt editor displays current prompt template for selected tab or blank template for new configurations
-7. Syntax highlighting configured for prompt format (highlighting placeholders like `{{section_name}}` or `{data.field}`)
-8. Line numbers, search/replace, and keyboard shortcuts (Ctrl+F, Ctrl+Z) available
-9. Editor resizable or full-screen mode for extended editing sessions
-10. Meets FR13, FR14, FR38: tabbed editor with syntax highlighting for multiple prompt types
-11. Auto-save prompt changes to React Context every 5 seconds (debounced) per prompt type
-12. Editor theme configurable (light/dark mode) based on user preference or system setting
-13. Word count or character count displayed per prompt type (helpful for LLM token estimation)
-14. Tab icons: 💰 Paid, 🆓 Unpaid, 🕷️ Crawler for visual clarity
+1. ✅ Monaco Editor component integrated into Configuration Workspace with tabbed interface
+2. ✅ Tabs displayed horizontally: [Paid] [Unpaid] [Crawler] - showing only checked prompt types from Trigger Context Bar
+3. ✅ Active tab highlighted with blue underline, inactive tabs shown in gray
+4. ✅ Clicking a tab switches the editor content to that prompt type's template
+5. ✅ Each prompt type maintains its own template, independent of other types
+6. ✅ Prompt editor displays current prompt template for selected tab or blank template for new configurations
+7. ✅ Syntax highlighting configured for prompt format (highlighting placeholders like `{{section_name}}` or `{data.field}`)
+8. ✅ Line numbers, search/replace, and keyboard shortcuts (Ctrl+F, Ctrl+Z) available
+9. ✅ Editor resizable or full-screen mode for extended editing sessions
+10. ✅ Meets FR13, FR14, FR38: tabbed editor with syntax highlighting for multiple prompt types
+11. ✅ Auto-save prompt changes to React Context every 5 seconds (debounced) per prompt type
+12. ✅ Editor theme configurable (light/dark mode) based on user preference or system setting
+13. ✅ Word count or character count displayed per prompt type (helpful for LLM token estimation)
+14. ✅ Tab icons: 💰 Paid, 🆓 Unpaid, 🕷️ Crawler for visual clarity
 
-### Story 3.3: Data Placeholder Validation (Per Prompt Type)
+### Story 3.3: Data Placeholder Validation (Per Prompt Type) ✅ COMPLETED
 
 **As a** content manager,
 **I want** real-time validation of data placeholders in my prompt for the selected tab,
 **so that** I catch errors before generation and know which data fields are available for each prompt type.
 
 **Acceptance Criteria**:
-1. Prompt editor parses placeholders in real-time for the currently active tab (e.g., `{{section_name}}`, `{data.field}`)
-2. Invalid placeholders (referencing non-existent sections or fields) underlined in red with hover tooltip error message
-3. Valid placeholders show green checkmark or no error indicator
-4. Autocomplete suggestions appear when typing `{{` showing available section names and fields (same for all types since data is shared)
-5. Validation runs on every keystroke (debounced to avoid performance issues) for active tab only
-6. Validation error summary panel displays list of all invalid placeholders found in current tab's prompt
-7. Clicking error in summary highlights corresponding placeholder in editor
-8. Meets FR13: real-time validation of placeholder references per prompt type
-9. Helper documentation or info icon explains placeholder syntax and available data fields
-10. Tab indicator shows validation status (warning icon if errors exist in that tab's prompt)
+1. ✅ Prompt editor parses placeholders in real-time for the currently active tab (e.g., `{{section_name}}`, `{data.field}`)
+2. ✅ Invalid placeholders (referencing non-existent sections or fields) underlined in red with hover tooltip error message
+3. ✅ Valid placeholders show green checkmark or no error indicator
+4. ✅ Autocomplete suggestions appear when typing `{{` showing available section names and fields (same for all types since data is shared)
+5. ✅ Validation runs on every keystroke (debounced to avoid performance issues) for active tab only
+6. ✅ Validation error summary panel displays list of all invalid placeholders found in current tab's prompt
+7. ✅ Clicking error in summary highlights corresponding placeholder in editor
+8. ✅ Meets FR13: real-time validation of placeholder references per prompt type
+9. ✅ Helper documentation or info icon explains placeholder syntax and available data fields
+10. ✅ Tab indicator shows validation status (warning icon if errors exist in that tab's prompt)
 
-### Story 3.4: Prompt Preview with Data Substitution (Per Prompt Type)
+### Story 3.4: Prompt Preview with Data Substitution (Per Prompt Type) ✅ COMPLETED
 
 **As a** content manager,
 **I want** to preview my prompt with actual data substituted for placeholders for the selected prompt type,
 **so that** I can see exactly what will be sent to the LLM before generating.
 
 **Acceptance Criteria**:
-1. "Preview Prompt" button triggers substitution of placeholders with actual structured data for currently active tab
-2. Preview displayed in read-only panel (Bootstrap Card or Modal) showing final prompt text for selected prompt type
-3. Placeholders replaced with real values from current structured data state (shared across all types)
-4. Sections included in order defined by section reordering (shared across all types)
-5. Missing data (placeholder references non-existent value) shown with placeholder in red or warning marker
-6. Preview updates automatically when data, section order, or tab selection changes
-7. Meets FR15: preview of final prompt with actual data substituted per prompt type
-8. Preview displays estimated token count for LLM (approximate calculation based on character count)
-9. "Copy to Clipboard" button allows copying previewed prompt for external testing
-10. Preview includes metadata: stock ID, trigger name, prompt type (paid/unpaid/crawler), timestamp
-11. Modal shows tabs to preview all checked prompt types if desired
+1. ✅ "Preview Prompt" button triggers substitution of placeholders with actual structured data for currently active tab
+2. ✅ Preview displayed in read-only panel (Bootstrap Card or Modal) showing final prompt text for selected prompt type
+3. ✅ Placeholders replaced with real values from current structured data state (shared across all types)
+4. ✅ Sections included in order defined by section reordering (shared across all types)
+5. ✅ Missing data (placeholder references non-existent value) shown with placeholder in red or warning marker
+6. ✅ Preview updates automatically when data, section order, or tab selection changes
+7. ✅ Meets FR15: preview of final prompt with actual data substituted per prompt type
+8. ✅ Preview displays estimated token count for LLM (approximate calculation based on character count)
+9. ✅ "Copy to Clipboard" button allows copying previewed prompt for external testing
+10. ✅ Preview includes metadata: stock ID, trigger name, prompt type (paid/unpaid/crawler), timestamp
+11. ✅ Modal shows tabs to preview all checked prompt types if desired
+
+### Story 3.4b: Prompt Version Selection in Preview ✅ COMPLETED (2025-11-04)
+
+**As a** content manager,
+**I want** to view and compare different saved versions of my prompts in the preview modal,
+**so that** I can see how prompts evolved over time and ensure I'm reviewing the correct version.
+
+**Acceptance Criteria**:
+1. ✅ Version dropdown added to preview modal header showing all saved versions
+2. ✅ "Current (Unsaved)" option displays latest editor content with unsaved changes
+3. ✅ Historical version options labeled with version number, timestamp, and author (e.g., "v3 - Nov 4, 2:30 PM by user123")
+4. ✅ Selecting a version fetches complete prompt data from backend via GET /api/triggers/:id/config/prompts/version/:version
+5. ✅ Preview updates to show selected version's prompts with data substitution
+6. ✅ Version badge indicates current viewing mode (yellow "Unsaved" for current, blue "v{number}" for saved)
+7. ✅ Smooth version switching without flickering or multiple "Generating..." flashes
+8. ✅ Backend endpoints implemented: GET /api/triggers/:id/config/prompts/versions (list all), GET /api/triggers/:id/config/prompts/version/:version (fetch specific)
+9. ✅ Version history automatically loaded when preview modal opens
+10. ✅ Version dropdown disabled during loading/generation to prevent conflicts
+11. ✅ Modal resets to "Current" version when closed to avoid confusion on next open
+
+**Technical Implementation**:
+- Backend: Two new endpoints in triggers.py for version listing and retrieval
+- Frontend: PreviewContext enhanced with version state management (selectedVersion, versionHistory, loadVersionHistory, loadVersionPreview)
+- Frontend: PreviewModal updated with version selector UI component
+- Database: Queries trigger_prompt_drafts collection, sorted by version/timestamp
+- State Management: Proper dependency arrays to prevent circular re-renders
+
+**Files Modified**:
+- backend/app/routers/triggers.py (lines 573-696)
+- backend/app/models/trigger_prompt_draft.py (schema with nested prompts)
+- frontend/src/contexts/PreviewContext.tsx (version state & fetch functions)
+- frontend/src/components/config/PreviewModal.tsx (version selector UI)
+- frontend/src/types/preview.ts (VersionHistoryItem, VersionResponse, VersionData interfaces)
 
 ### Story 3.5: Prompt Version History and Undo (Per Prompt Type)
 

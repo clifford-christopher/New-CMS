@@ -15,15 +15,17 @@ This architecture document is **focused on the planned News CMS implementation**
 
 ### Document Status
 
-**Project Phase**: Epic 1 - Foundation & Core Infrastructure (Story 1.5a in progress)
+**Project Phase**: Epic 3 - Prompt Engineering Workspace (Stories 3.1-3.4b completed, 12 total stories complete)
 
-**Last Updated**: 2025-10-29
+**Last Updated**: 2025-11-04
 
 ### Change Log
 
-| Date       | Version | Description                    | Author  |
-|------------|---------|--------------------------------|---------|
-| 2025-10-29 | 1.0     | Initial architecture document  | Winston |
+| Date       | Version | Description                                                          | Author  |
+|------------|---------|----------------------------------------------------------------------|---------|
+| 2025-11-04 | 1.2     | Updated completion status for 12 stories (Epic 1: 1.1-1.4, Epic 2: 2.1, 2.3, 2.5, Epic 3: 3.1-3.4b) | Claude  |
+| 2025-11-04 | 1.1     | Added version selection in preview (Story 3.4b)                      | Claude  |
+| 2025-10-29 | 1.0     | Initial architecture document                                        | Winston |
 
 ## Quick Reference - Key Files and Entry Points
 
@@ -436,6 +438,67 @@ Body: { "raw_data": {...} }
 Response: { "structured_data": { "sections": [...] }, "errors": [] }
 ```
 
+#### Epic 3 - Prompt Management APIs
+
+**Prompt Version History** (Story 3.4b - IMPLEMENTED):
+```
+GET /api/triggers/:id/config/prompts/versions
+Response: {
+  "versions": [
+    {
+      "version": 3,
+      "saved_at": "2025-11-04T10:30:00Z",
+      "saved_by": "system",
+      "is_draft": true,
+      "prompt_types": ["paid", "unpaid", "crawler"]
+    },
+    ...
+  ],
+  "total": 5,
+  "trigger_name": "52wk_high"
+}
+
+GET /api/triggers/:id/config/prompts/version/:version_number
+Response: {
+  "trigger_name": "52wk_high",
+  "version": 2,
+  "saved_at": "2025-11-04T09:15:00Z",
+  "saved_by": "user123",
+  "prompts": {
+    "paid": {
+      "template": "...",
+      "character_count": 450,
+      "word_count": 75,
+      "last_saved": "2025-11-04T09:15:00Z",
+      "version": 2,
+      "is_draft": true
+    },
+    "unpaid": {...},
+    "crawler": {...}
+  },
+  "is_draft": true
+}
+```
+
+**Prompt Save** (Creates new version):
+```
+POST /api/triggers/:id/config/prompts
+Body: {
+  "prompts": {
+    "paid": { "template": "..." },
+    "unpaid": { "template": "..." },
+    "crawler": { "template": "..." }
+  }
+}
+Response: {
+  "success": true,
+  "message": "Saved prompt draft successfully (version 3)",
+  "draft": { /* complete draft document */ },
+  "trigger_name": "52wk_high",
+  "version": 3
+}
+```
+
 #### Epic 4 - LLM Generation APIs
 
 **Multi-Model Generation** (Story 4.3):
@@ -506,16 +569,46 @@ Response: {
 
 ### MongoDB Collections Schema Design
 
-**Collections** (to be created in Story 1.2):
+**Collections**:
 - `triggers`: Trigger definitions
 - `configurations`: Configuration versions (includes all 3 prompt types in single document)
+- ✅ `trigger_prompt_drafts`: **NEW** - Draft versions of prompts (IMPLEMENTED 2025-11-04)
 - `users`: User accounts (may integrate with existing auth system)
 - `audit_log`: Change tracking
 - `generation_history`: Test generation results (session-level, 30-day retention)
 
+**trigger_prompt_drafts Collection Schema** (Story 3.4b - IMPLEMENTED):
+```javascript
+{
+  "trigger_name": "52wk_high",           // String - Trigger identifier
+  "prompts": {                           // Object - Nested prompt templates
+    "paid": {
+      "template": "...",                 // String - Prompt template content
+      "character_count": 450,            // Number - Character count
+      "word_count": 75                   // Number - Word count
+    },
+    "unpaid": { /* same structure */ },
+    "crawler": { /* same structure */ }
+  },
+  "saved_by": "user123",                 // String - User ID who saved
+  "saved_at": ISODate("2025-11-04T10:30:00Z"),  // Date - Save timestamp
+  "is_draft": true,                      // Boolean - Draft flag (true for all drafts)
+  "version": 3,                          // Number - Auto-incremented version per trigger
+  "session_id": "abc-123-def"            // String - Optional session identifier
+}
+```
+
+**Key Design Decisions for trigger_prompt_drafts**:
+- **Single Document per Version**: Each save creates one document containing all 3 prompt types
+- **Version Increment**: Version number auto-increments per trigger (not per prompt type)
+- **Immutable History**: Old versions never deleted, enables version comparison
+- **Separate from trigger_prompts**: Draft collection isolated from published configurations
+- **No prompt_type Field**: Removed - all prompts nested under `prompts` object
+
 **Indexes** (to be created):
 - `triggers`: `{ trigger_id: 1 }`
 - `configurations`: `{ trigger_id: 1, is_active: 1 }`, `{ version: -1 }`
+- ✅ `trigger_prompt_drafts`: `{ trigger_name: 1, version: -1 }`, `{ trigger_name: 1, saved_at: -1 }`
 - `audit_log`: `{ trigger_id: 1, timestamp: -1 }`, `{ user_id: 1 }`
 
 ## Integration Points and External Dependencies
@@ -690,6 +783,116 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
 - UI/UX Specification v2.2 completed (multi-prompt type support)
 - Epic 1 Story 1.5a added (Third-Party API Setup)
 
+✅ **Epic 1 - Foundation & Core Infrastructure** (4/5 stories completed):
+
+**Story 1.1 - Project Setup and Monorepo Structure** (COMPLETED):
+- Monorepo structure with frontend/ (Next.js 14 + TypeScript) and backend/ (Python/FastAPI)
+- Frontend dependencies: React-Bootstrap, Monaco Editor, React DnD
+- Backend dependencies: FastAPI, Pydantic v2, Motor (MongoDB async), pytest
+- Git repository initialized with .gitignore for Node.js and Python
+- Both applications run successfully in development mode
+- Files: frontend/package.json, backend/requirements.txt, README.md
+
+**Story 1.2 - MongoDB Database Setup and Connection** (COMPLETED):
+- MongoDB connection using Motor async driver
+- Pydantic models created: Trigger, Configuration, User, AuditLog, GenerationHistory, StructuredData
+- Health check endpoint: GET /api/health returns MongoDB status
+- Collections: news_triggers, trigger_prompts, trigger_prompt_drafts, structured_data_jobs
+- Files: backend/app/database.py, backend/app/models/*.py
+
+**Story 1.3 - Basic UI Shell and Navigation** (COMPLETED):
+- Next.js App Router layout with Bootstrap 5 global styling
+- Responsive Navbar component with navigation links
+- Footer component displaying application name
+- LoadingSpinner component for async operations
+- Responsive design (1200px+ desktop, 768px+ tablet)
+- Files: frontend/src/app/layout.tsx, frontend/src/components/layout/*.tsx
+
+**Story 1.4 - Trigger Management Dashboard** (COMPLETED):
+- Backend endpoint: GET /api/triggers/ (list all triggers)
+- Backend endpoint: GET /api/triggers/:trigger_name (get specific trigger)
+- Dashboard page with trigger dropdown selector
+- Quick Stats cards: Total Triggers, Configured, Last Updated
+- "All Triggers" table with status badges
+- Navigation to /config/:triggerId on trigger selection
+- Files: frontend/src/app/page.tsx, backend/app/routers/triggers.py
+
+✅ **Epic 2 - Data Pipeline & Integration** (3/5 stories completed):
+
+**Story 2.1 - API Configuration Interface** (COMPLETED):
+- Configuration Workspace page at /config/:triggerId
+- Trigger Context Bar with Stock ID input and section selection
+- Data mode selection: OLD / NEW / OLD_NEW
+- Backend endpoints for API management
+- AVAILABLE_APIS registry with 8 APIs defined
+- Files: frontend/src/app/config/[triggerId]/page.tsx, backend/app/routers/triggers.py (lines 314-458)
+
+**Story 2.3 - Data Retrieval and Raw JSON Display** (COMPLETED):
+- Backend async job pattern: POST /api/data/generate, GET /api/data/jobs/:job_id/status
+- Frontend components: OldDataDisplay.tsx, NewDataDisplay.tsx
+- Async data generation using structured_data_service.py
+- MongoDB structured_data_jobs collection for status tracking
+- Files: backend/app/routers/data.py, backend/app/services/structured_data_service.py
+
+**Story 2.5 - Structured Data Display and Section Preview** (COMPLETED):
+- SectionManagementPanel.tsx - displays and orders sections
+- NewDataDisplay.tsx - shows generated sections with collapsible cards
+- OldDataDisplay.tsx - shows OLD data sections
+- DataPreviewPanel.tsx - preview modal for final data structure
+- Visual badges for OLD (blue) vs NEW (green) sections
+- Files: frontend/src/components/SectionManagementPanel.tsx, frontend/src/components/config/DataPreviewPanel.tsx
+
+✅ **Epic 3 - Prompt Engineering Workspace** (5/6 stories completed):
+
+**Story 3.1 - Section Reordering Interface** (COMPLETED):
+- SectionManagementPanel with React DnD drag-and-drop
+- Displays only selected sections with source badges (OLD/NEW)
+- Preview mode shows final output order
+- localStorage persistence per trigger
+- Files: frontend/src/components/SectionManagementPanel.tsx
+
+**Story 3.2 - Tabbed Prompt Editor with Syntax Highlighting** (COMPLETED):
+- Monaco Editor integration with custom themes (prompt-dark, prompt-light)
+- Tabbed interface: Paid | Unpaid | Crawler
+- Syntax highlighting for placeholders {{variable}} and {data.field}
+- Auto-save every 5 seconds (debounced)
+- Character/word count per tab
+- Components: PromptEditor.tsx, PromptTabs.tsx, CharacterCounter.tsx
+- Context: PromptContext.tsx
+- Files: frontend/src/components/config/PromptEditor.tsx, frontend/src/contexts/PromptContext.tsx
+
+**Story 3.3 - Data Placeholder Validation** (COMPLETED):
+- ValidationContext.tsx for real-time validation
+- ValidationSummary.tsx displays errors with line numbers
+- Invalid placeholders underlined in red with tooltips
+- Autocomplete suggestions for placeholders
+- Tab indicators show warning if errors exist
+- Files: frontend/src/contexts/ValidationContext.tsx, frontend/src/components/config/ValidationSummary.tsx
+
+**Story 3.4 - Prompt Preview with Data Substitution** (COMPLETED):
+- PreviewModal.tsx with "Preview Final Prompt" button
+- PreviewContext.tsx manages preview state
+- Substitutes placeholders with actual data
+- Shows missing placeholders in red
+- Estimated token count displayed
+- "Copy to Clipboard" functionality
+- Modal supports previewing all checked prompt types
+- Files: frontend/src/components/config/PreviewModal.tsx, frontend/src/contexts/PreviewContext.tsx
+
+**Story 3.4b - Prompt Version Selection in Preview** (COMPLETED 2025-11-04):
+- Backend endpoints: GET /api/triggers/:id/config/prompts/versions, GET /api/triggers/:id/config/prompts/version/:version
+- Version dropdown in PreviewModal header
+- Version badge (yellow "Unsaved" for current, blue "v{number}" for saved)
+- Smooth version switching without flickering (fixed circular dependency issue)
+- Version history automatically loaded when modal opens
+- Modal resets to "Current" when closed
+- Files modified:
+  - backend/app/routers/triggers.py (lines 573-696)
+  - backend/app/models/trigger_prompt_draft.py
+  - frontend/src/contexts/PreviewContext.tsx
+  - frontend/src/components/config/PreviewModal.tsx
+  - frontend/src/types/preview.ts
+
 ⚠️ **Story 1.5a - Third-Party API Setup** (IN PROGRESS):
 - API key acquisition process documented
 - test-api-keys.py script created for validation
@@ -699,14 +902,30 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
 
 ### Not Yet Started
 
-❌ **Epic 1 - Foundation & Core Infrastructure**:
-- Story 1.1: Project Setup and Monorepo Structure
-- Story 1.2: MongoDB Database Setup and Connection
-- Story 1.3: Basic UI Shell and Navigation
-- Story 1.4: Trigger Management Dashboard
+❌ **Epic 1 - Foundation & Core Infrastructure** (1/5 remaining):
 - Story 1.6: AWS Deployment Setup for Staging Environment
 
-❌ **Epic 2-5**: All stories not started (Epic 1 prerequisite)
+❌ **Epic 2 - Data Pipeline & Integration** (2/5 remaining):
+- Story 2.2: Data API Integration Layer (directory created, no implementations)
+- Story 2.4: Parser Integration and Execution (uses external script, no adapter layer)
+
+❌ **Epic 3 - Prompt Engineering Workspace** (1/6 remaining):
+- Story 3.5: Prompt Version History and Undo (backend complete, frontend UI pending)
+
+❌ **Epic 4 - Multi-Model Generation & Testing** (0/6 started):
+- Story 4.1: LLM Abstraction Layer and Provider Integration
+- Story 4.2: Model Selection Interface
+- Story 4.3: Parallel News Generation
+- Story 4.4: Grouped Result Comparison
+- Story 4.5: Iterative Refinement Workflow
+- Story 4.6: Post-Generation Metadata Display
+
+❌ **Epic 5 - Configuration Publishing & Production Integration** (0/5 started):
+- Story 5.1: Pre-Publish Validation
+- Story 5.2: Configuration Publishing with Confirmation
+- Story 5.3: Audit Logging and Change Tracking (model created, no implementation)
+- Story 5.4: Configuration Version History and Rollback
+- Story 5.5: Production Integration and Active Configuration API (partial - config API exists)
 
 ### Known Gaps and Technical Debt (Before Any Code Written)
 
@@ -759,28 +978,28 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - Run test-api-keys.py successfully
    - **Blockers**: Anthropic API approval (1-2 days), financial data API provider selection
 
-2. ❌ **Story 1.1**: Project Setup and Monorepo Structure
+2. ✅ **Story 1.1** (COMPLETED): Project Setup and Monorepo Structure
    - Create frontend/ and backend/ directories
    - Initialize package.json (frontend) and requirements.txt (backend)
    - Configure TypeScript, ESLint, pytest
    - Create .gitignore, README.md
    - Both apps run locally (uvicorn, npm run dev)
 
-3. ❌ **Story 1.2**: MongoDB Database Setup and Connection
+3. ✅ **Story 1.2** (COMPLETED): MongoDB Database Setup and Connection
    - Install MongoDB or configure Atlas
    - Create Pydantic models (Trigger, Configuration, User, AuditLog)
    - Establish Motor async connection in FastAPI
    - Health check endpoint: GET /api/health
    - Seed script populates sample triggers
 
-4. ❌ **Story 1.3**: Basic UI Shell and Navigation
+4. ✅ **Story 1.3** (COMPLETED): Basic UI Shell and Navigation
    - Next.js layout with Bootstrap 5 CSS
    - Navbar with logo, Dashboard link, user info
    - Footer
    - Responsive grid system tested at 1200px, 768px
    - Loading spinner component
 
-5. ❌ **Story 1.4**: Trigger Management Dashboard
+5. ✅ **Story 1.4** (COMPLETED): Trigger Management Dashboard
    - GET /api/triggers endpoint
    - Dashboard page with dropdown trigger selector
    - Quick stats cards (Total Triggers, Configured, Last Updated)
@@ -811,7 +1030,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
 **Goal**: Build data retrieval and transformation pipeline.
 
 **Stories**:
-1. ❌ **Story 2.1**: API Configuration Interface
+1. ✅ **Story 2.1** (COMPLETED): API Configuration Interface
    - Configuration Workspace page (frontend)
    - Trigger Context Bar with Stock ID input + prompt type checkboxes
    - Section Selection Dropdown (14 hardcoded sections, 5 pre-selected by backend)
@@ -825,7 +1044,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - Retry logic, rate limiting, request logging
    - Unit tests with mocked HTTP responses
 
-3. ❌ **Story 2.3**: Data Retrieval and Raw JSON Display
+3. ✅ **Story 2.3** (COMPLETED): Data Retrieval and Raw JSON Display
    - POST /api/triggers/:id/data/fetch endpoint
    - Fetch data from configured APIs in parallel
    - Return raw JSON per section
@@ -841,7 +1060,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - Graceful error handling with actionable messages
    - Unit tests with sample JSON inputs
 
-5. ❌ **Story 2.5**: Structured Data Display and Section Preview
+5. ✅ **Story 2.5** (COMPLETED): Structured Data Display and Section Preview
    - Frontend displays parsed sections in Bootstrap Cards
    - Collapsible sections
    - Visual mapping (which API → which section)
@@ -864,7 +1083,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
 **Goal**: Create prompt editing environment with multi-prompt type support.
 
 **Stories**:
-1. ❌ **Story 3.1**: Section Reordering Interface (Shared Across All Prompt Types)
+1. ✅ **Story 3.1** (COMPLETED): Section Reordering Interface (Shared Across All Prompt Types)
    - "Section Management" panel
    - Displays only selected sections from Data Configuration
    - Drag-and-drop sortable list (React DnD)
@@ -872,7 +1091,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - "Preview Data Structure" button
    - Section order saved to MongoDB
 
-2. ❌ **Story 3.2**: Tabbed Prompt Editor with Syntax Highlighting
+2. ✅ **Story 3.2** (COMPLETED): Tabbed Prompt Editor with Syntax Highlighting
    - Monaco Editor component integrated
    - Tabbed interface: [💰 Paid] [🆓 Unpaid] [🕷️ Crawler]
    - Tab visibility controlled by Trigger Context Bar checkboxes
@@ -882,7 +1101,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - Word/character count per tab
    - Auto-save every 5 seconds (debounced) per prompt type
 
-3. ❌ **Story 3.3**: Data Placeholder Validation (Per Prompt Type)
+3. ✅ **Story 3.3** (COMPLETED): Data Placeholder Validation (Per Prompt Type)
    - Real-time parsing of placeholders for active tab only
    - Invalid placeholders underlined in red with tooltips
    - Valid placeholders show green checkmark
@@ -890,7 +1109,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - Validation error summary panel with line numbers
    - Tab indicator shows warning icon if errors in that tab's prompt
 
-4. ❌ **Story 3.4**: Prompt Preview with Data Substitution (Per Prompt Type)
+4. ✅ **Story 3.4** (COMPLETED): Prompt Preview with Data Substitution (Per Prompt Type)
    - "Preview Final Prompt" button for active tab
    - Modal displays final prompt with actual data substituted
    - Missing data shown with red placeholder warning
@@ -899,7 +1118,17 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
    - "Copy to Clipboard" button
    - Modal can show tabs to preview all checked prompt types
 
-5. ❌ **Story 3.5**: Prompt Version History and Undo (Per Prompt Type)
+5. ✅ **Story 3.4b**: Prompt Version Selection in Preview (COMPLETED - 2025-11-04)
+   - Version dropdown added to preview modal header
+   - Lists all saved versions with timestamps and authors
+   - "Current (Unsaved)" option shows latest editor content
+   - Historical version selection fetches complete prompt data from backend
+   - Smooth version switching without flickering
+   - Version badge indicates current vs saved versions
+   - Backend endpoints: GET /api/triggers/:id/config/prompts/versions, GET /api/triggers/:id/config/prompts/version/:version
+   - Files: PreviewContext.tsx, PreviewModal.tsx, preview.ts, triggers.py
+
+6. ❌ **Story 3.5**: Prompt Version History and Undo (Per Prompt Type)
    - Prompt changes tracked in local history per tab
    - Undo/Redo buttons (Ctrl+Z, Ctrl+Y) per tab
    - Version history panel shows last 10 versions per prompt type
@@ -912,6 +1141,7 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
 - Tabbed prompt editor works with 3 independent prompt types
 - Placeholder validation catches errors per tab
 - Prompt preview shows final prompt with data substituted per type
+- ✅ Version selection in preview allows viewing historical prompts
 - Version history tracks changes per prompt type
 
 ### Epic 4: Multi-Model Generation & Testing (Weeks 10-12)
@@ -1327,8 +1557,14 @@ db.configurations.find({ is_active: true }).pretty()
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-10-29
-**Next Review**: End of Epic 1 (Week 3)
+**Document Version**: 1.1
+**Last Updated**: 2025-11-04
+**Next Review**: End of Epic 3 (Week 9)
+
+**Recent Updates**:
+- Added Story 3.4b: Prompt Version Selection in Preview (completed)
+- Documented trigger_prompt_drafts collection schema
+- Added version management API endpoints
+- Updated project phase to Epic 3
 
 This architecture document will be updated as implementation progresses and technical decisions are made. All unknowns and risks should be resolved and documented in updates to this file.

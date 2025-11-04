@@ -21,7 +21,11 @@ export default function PreviewModal() {
     activePreviewTab,
     setActivePreviewTab,
     isGenerating,
-    error
+    error,
+    selectedVersion,
+    versionHistory,
+    isLoadingVersions,
+    setSelectedVersion
   } = usePreview();
 
   const { checkedTypes } = usePrompt();
@@ -38,6 +42,28 @@ export default function PreviewModal() {
     }
   };
 
+  const handleVersionChange = (value: string) => {
+    if (value === 'current') {
+      setSelectedVersion('current');
+    } else {
+      setSelectedVersion(parseInt(value, 10));
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const visibleTabs = (['paid', 'unpaid', 'crawler'] as PromptType[]).filter(type =>
     checkedTypes.has(type)
   );
@@ -45,21 +71,49 @@ export default function PreviewModal() {
   return (
     <Modal show={isModalOpen} onHide={closeModal} size="xl" scrollable>
       <Modal.Header closeButton>
-        <div>
-          <Modal.Title>
-            <i className="bi bi-eye me-2"></i>
-            Preview Final Prompt
-          </Modal.Title>
-          {previewMetadata && (
-            <small className="text-muted d-block mt-1">
-              <i className="bi bi-tag me-1"></i>
-              {previewMetadata.triggerName} |
-              <i className="bi bi-graph-up ms-2 me-1"></i>
-              Stock: {previewMetadata.stockId} |
-              <i className="bi bi-clock ms-2 me-1"></i>
-              {previewMetadata.timestamp.toLocaleTimeString()}
-            </small>
-          )}
+        <div className="w-100">
+          <div className="d-flex justify-content-between align-items-start">
+            <div>
+              <Modal.Title>
+                <i className="bi bi-eye me-2"></i>
+                Preview Final Prompt
+              </Modal.Title>
+              {previewMetadata && (
+                <small className="text-muted d-block mt-1">
+                  <i className="bi bi-tag me-1"></i>
+                  {previewMetadata.triggerName} |
+                  <i className="bi bi-graph-up ms-2 me-1"></i>
+                  Stock: {previewMetadata.stockId} |
+                  <i className="bi bi-clock ms-2 me-1"></i>
+                  {previewMetadata.timestamp.toLocaleTimeString()}
+                </small>
+              )}
+            </div>
+
+            <div className="d-flex align-items-center gap-2 ms-3">
+              <Form.Label className="mb-0 text-muted small">Version:</Form.Label>
+              <Form.Select
+                size="sm"
+                style={{ width: '250px' }}
+                value={selectedVersion}
+                onChange={(e) => handleVersionChange(e.target.value)}
+                disabled={isLoadingVersions || isGenerating}
+              >
+                <option value="current">Current (Unsaved)</option>
+                {versionHistory.map((v) => (
+                  <option key={v.version} value={v.version}>
+                    v{v.version} - {formatDate(v.saved_at)} by {v.saved_by}
+                  </option>
+                ))}
+              </Form.Select>
+              <Badge
+                bg={selectedVersion === 'current' ? 'warning' : 'info'}
+                className="ms-1"
+              >
+                {selectedVersion === 'current' ? 'Unsaved' : `v${selectedVersion}`}
+              </Badge>
+            </div>
+          </div>
         </div>
       </Modal.Header>
 
