@@ -68,7 +68,7 @@ def _get_keys_from_env() -> Dict[str, Optional[str]]:
     keys = {
         "openai": os.getenv("OPENAI_API_KEY"),
         "anthropic": os.getenv("ANTHROPIC_API_KEY"),
-        "google": os.getenv("GOOGLE_API_KEY"),
+        "gemini": os.getenv("GOOGLE_API_KEY"),
     }
 
     # Log which keys are available (without revealing the keys)
@@ -108,7 +108,7 @@ def _get_keys_from_aws_secrets() -> Dict[str, Optional[str]]:
         secret_names = {
             "openai": f"{prefix}llm/openai/api-key",
             "anthropic": f"{prefix}llm/anthropic/api-key",
-            "google": f"{prefix}llm/google/api-key",
+            "gemini": f"{prefix}llm/google/api-key",
         }
 
         keys = {}

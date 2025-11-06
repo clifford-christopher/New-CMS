@@ -298,6 +298,10 @@ class NewsGenerationService:
         # Get API key
         api_key = self.api_keys.get(provider_name)
 
+        # Debug: Log available keys
+        logger.info(f"Available API keys: {list(self.api_keys.keys())}")
+        logger.info(f"Looking for provider: {provider_name}, Found: {api_key is not None}")
+
         if not api_key:
             raise ValueError(f"API key not found for provider: {provider_name}")
 
