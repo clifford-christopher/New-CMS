@@ -28,6 +28,7 @@ import { GenerationProvider } from '@/contexts/GenerationContext';
 import { SectionData } from '@/types/validation';
 import ModelSelection from '@/components/config/ModelSelection';
 import TestGenerationPanel from '@/components/config/TestGenerationPanel';
+import GenerationHistoryPanel from '@/components/config/GenerationHistoryPanel';
 
 interface PageProps {
   params: { triggerId: string };
@@ -60,6 +61,9 @@ export default function ConfigurationPage({ params }: PageProps) {
 
   // Data panel visibility toggle for Prompt Engineering section
   const [showDataPanel, setShowDataPanel] = useState(true);
+
+  // History panel visibility toggle for Testing step
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
   // Stock ID and data fetching
   const [stockId, setStockId] = useState('TCS');
@@ -1334,8 +1338,34 @@ export default function ConfigurationPage({ params }: PageProps) {
               <TestingStepWrapper promptTypes={promptTypes}>
                 <ModelProvider triggerId={triggerId}>
                   <GenerationProvider>
+                    {/* Toggle History Button */}
+                    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        variant={showHistoryPanel ? 'primary' : 'outline-secondary'}
+                        size="sm"
+                        onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                      >
+                        <i className={`bi bi-clock-history me-1`}></i>
+                        {showHistoryPanel ? 'Hide History' : 'View History'}
+                      </Button>
+                    </div>
+
                     <ModelSelection />
                     <TestGenerationPanel />
+
+                    {/* History Panel */}
+                    {showHistoryPanel && (
+                      <GenerationHistoryPanel
+                        triggerId={triggerId}
+                        onLoadConfiguration={(item) => {
+                          // TODO: Implement loading configuration from history item
+                          // This would populate the model selection, temperature, max_tokens
+                          // from the history item
+                          console.log('Load configuration from history:', item);
+                          alert('Load configuration feature coming soon! Check console for history item.');
+                        }}
+                      />
+                    )}
                   </GenerationProvider>
                 </ModelProvider>
               </TestingStepWrapper>

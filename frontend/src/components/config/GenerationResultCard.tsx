@@ -1,11 +1,14 @@
 /**
  * GenerationResultCard Component
- * Displays a single generation result with metadata
+ * Story 4.4 & 4.5: Displays a single generation result with metadata and version tracking
  */
 
 import React, { useState } from 'react';
 import { Card, Badge, Button, Alert, Spinner } from 'react-bootstrap';
 import { GenerationResult } from '@/types/generation';
+import { useGeneration } from '@/contexts/GenerationContext';
+import InlinePromptEditor from './InlinePromptEditor';
+import GenerationVersionModal from './GenerationVersionModal';
 
 interface GenerationResultCardProps {
   result: GenerationResult;
@@ -14,8 +17,26 @@ interface GenerationResultCardProps {
 const GenerationResultCard: React.FC<GenerationResultCardProps> = ({ result }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [showVersionModal, setShowVersionModal] = useState(false);
 
   const { response, status, error } = result;
+
+  // Get version tracking context (Story 4.5)
+  const {
+    isGenerating,
+    regenerateResult,
+    getVersions,
+    getSelectedVersion,
+    selectVersion
+  } = useGeneration();
+
+  // Get version information
+  const versions = getVersions(result.model_id, result.prompt_type);
+  const selectedVersion = getSelectedVersion(result.model_id, result.prompt_type);
+  const currentVersionNumber = selectedVersion?.version || 1;
+  const totalVersions = versions.length;
+  const hasMultipleVersions = totalVersions > 1;
 
   // Provider badge colors
   const providerColors: Record<string, string> = {
@@ -42,6 +63,28 @@ const GenerationResultCard: React.FC<GenerationResultCardProps> = ({ result }) =
         console.error('Failed to copy:', err);
       }
     }
+  };
+
+  /**
+   * Handle regeneration with same prompt (Story 4.5)
+   */
+  const handleRegenerateSame = async () => {
+    await regenerateResult(result.model_id, result.prompt_type);
+  };
+
+  /**
+   * Handle regeneration with edited prompt (Story 4.5)
+   */
+  const handleRegenerateEdited = async (editedPrompt: string) => {
+    await regenerateResult(result.model_id, result.prompt_type, editedPrompt);
+    setShowPromptEditor(false);
+  };
+
+  /**
+   * Handle open version comparison modal (Story 4.5)
+   */
+  const handleCompareVersions = () => {
+    setShowVersionModal(true);
   };
 
   const formatCost = (cost: number): string => {
@@ -118,6 +161,15 @@ const GenerationResultCard: React.FC<GenerationResultCardProps> = ({ result }) =
               {response.provider}
             </Badge>
             <strong>{response.model_name}</strong>
+            {/* Version Badge (Story 4.5) */}
+            {totalVersions > 0 && (
+              <Badge bg="info" className="ms-2">
+                v{currentVersionNumber} of {totalVersions}
+              </Badge>
+            )}
+            {selectedVersion?.is_selected && (
+              <i className="bi bi-check-circle-fill text-success ms-2" title="Selected version"></i>
+            )}
           </div>
           <div className="d-flex gap-2">
             <Button
@@ -149,6 +201,63 @@ const GenerationResultCard: React.FC<GenerationResultCardProps> = ({ result }) =
             </Button>
           )}
         </div>
+
+        {/* Regeneration Actions (Story 4.5) */}
+        <div className="mb-3 pb-3 border-bottom">
+          <div className="d-flex gap-2 flex-wrap">
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={handleRegenerateSame}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-arrow-repeat me-1"></i>
+                  Regenerate with Same Prompt
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setShowPromptEditor(!showPromptEditor)}
+              disabled={isGenerating}
+            >
+              <i className="bi bi-pencil me-1"></i>
+              {showPromptEditor ? 'Cancel Edit' : 'Edit & Regenerate'}
+            </Button>
+            {hasMultipleVersions && (
+              <Button
+                variant="outline-info"
+                size="sm"
+                onClick={handleCompareVersions}
+                disabled={isGenerating}
+              >
+                <i className="bi bi-code-square me-1"></i>
+                Compare Versions ({totalVersions})
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Inline Prompt Editor (Story 4.5) */}
+        {showPromptEditor && selectedVersion && (
+          <div className="mb-3">
+            <InlinePromptEditor
+              initialPrompt={selectedVersion.prompt_used}
+              promptType={result.prompt_type}
+              onRegenerate={handleRegenerateEdited}
+              onCancel={() => setShowPromptEditor(false)}
+              isGenerating={isGenerating}
+            />
+          </div>
+        )}
 
         {/* Metadata */}
         <div className="border-top pt-3">
@@ -214,6 +323,14 @@ const GenerationResultCard: React.FC<GenerationResultCardProps> = ({ result }) =
           </div>
         </div>
       </Card.Body>
+
+      {/* Version Comparison Modal (Story 4.5) */}
+      <GenerationVersionModal
+        modelId={result.model_id}
+        promptType={result.prompt_type}
+        show={showVersionModal}
+        onHide={() => setShowVersionModal(false)}
+      />
     </Card>
   );
 };

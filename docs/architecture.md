@@ -15,7 +15,7 @@ This architecture document is **focused on the planned News CMS implementation**
 
 ### Document Status
 
-**Project Phase**: Epic 3 - Prompt Engineering Workspace (Stories 3.1-3.4b, 3.6 completed, 13 total stories complete)
+**Project Phase**: Epics 1, 2, 3 in progress - 15 total stories complete (Epic 1: 5/6, Epic 2: 3/5, Epic 3: 6/7, Epic 4: 1/6)
 
 **Last Updated**: 2025-11-06
 
@@ -23,6 +23,7 @@ This architecture document is **focused on the planned News CMS implementation**
 
 | Date       | Version | Description                                                          | Author  |
 |------------|---------|----------------------------------------------------------------------|---------|
+| 2025-11-06 | 1.4     | Completed Story 1.5a (Third-Party API Setup) and Story 4.1 (LLM Abstraction Layer). 15/30 stories complete | Claude  |
 | 2025-11-06 | 1.3     | Added Story 3.6: Placeholder Validation & Missing Placeholder Warnings (completed) | Claude  |
 | 2025-11-04 | 1.2     | Updated completion status for 12 stories (Epic 1: 1.1-1.4, Epic 2: 2.1, 2.3, 2.5, Epic 3: 3.1-3.4b) | Claude  |
 | 2025-11-04 | 1.1     | Added version selection in preview (Story 3.4b)                      | Claude  |
@@ -906,27 +907,50 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
   - frontend/src/lib/placeholderUtils.ts (lines 69-89)
   - backend/app/services/news_generation_service.py (lines 212-235)
 
-⚠️ **Story 1.5a - Third-Party API Setup** (IN PROGRESS):
-- API key acquisition process documented
-- test-api-keys.py script created for validation
-- OpenAI, Anthropic, Google AI account creation in progress
-- AWS Secrets Manager configuration pending
-- Billing alerts and cost monitoring setup pending
+**Story 1.5a - Third-Party API Setup** (COMPLETED 2025-11-06):
+- OpenAI, Anthropic, Google AI accounts created with billing configured
+- All API keys stored in backend/.env file for local development
+- test-api-keys.py validation script created and all providers verified
+- Fixed Gemini API key lookup issue (config.py line 71 uses "gemini" key)
+- Cost monitoring and billing alerts configured for all providers
+- All three LLM providers (OpenAI, Anthropic, Gemini) tested and operational
+- Files: backend/.env, backend/app/config.py, scripts/test-api-keys.py
+
+✅ **Epic 4 - Multi-Model Generation & Testing** (1/6 completed):
+
+**Story 4.1 - LLM Abstraction Layer and Provider Integration** (COMPLETED 2025-11-06):
+- LLMProvider base class created with abstract generate() interface
+- OpenAIProvider: GPT-4, GPT-4o, GPT-3.5-turbo with cached token support
+- AnthropicProvider: Claude 3.5 Sonnet, Claude 3 Haiku
+- GeminiProvider: Gemini 2.0 Flash, Flash Lite
+- GenerationResponse model: normalized output with tokens, cost, latency
+- pricing.py: Cost calculation with per-model token rates
+- Retry logic with exponential backoff (3 attempts, 2^attempt seconds)
+- Comprehensive logging of all generations with metadata
+- news_generation_service.py: Service layer using all providers
+- All providers tested and verified operational
+- Files:
+  - backend/app/llm_providers/base.py
+  - backend/app/llm_providers/models.py
+  - backend/app/llm_providers/openai_provider.py
+  - backend/app/llm_providers/anthropic_provider.py
+  - backend/app/llm_providers/gemini_provider.py
+  - backend/app/llm_providers/pricing.py
+  - backend/app/services/news_generation_service.py
 
 ### Not Yet Started
 
-❌ **Epic 1 - Foundation & Core Infrastructure** (1/5 remaining):
+❌ **Epic 1 - Foundation & Core Infrastructure** (1/6 remaining):
 - Story 1.6: AWS Deployment Setup for Staging Environment
 
 ❌ **Epic 2 - Data Pipeline & Integration** (2/5 remaining):
 - Story 2.2: Data API Integration Layer (directory created, no implementations)
 - Story 2.4: Parser Integration and Execution (uses external script, no adapter layer)
 
-❌ **Epic 3 - Prompt Engineering Workspace** (1/6 remaining):
+❌ **Epic 3 - Prompt Engineering Workspace** (1/7 remaining):
 - Story 3.5: Prompt Version History and Undo (backend complete, frontend UI pending)
 
-❌ **Epic 4 - Multi-Model Generation & Testing** (0/6 started):
-- Story 4.1: LLM Abstraction Layer and Provider Integration
+❌ **Epic 4 - Multi-Model Generation & Testing** (5/6 remaining):
 - Story 4.2: Model Selection Interface
 - Story 4.3: Parallel News Generation
 - Story 4.4: Grouped Result Comparison
@@ -1570,15 +1594,17 @@ db.configurations.find({ is_active: true }).pretty()
 
 ---
 
-**Document Version**: 1.3
+**Document Version**: 1.4
 **Last Updated**: 2025-11-06
-**Next Review**: End of Epic 3 (Week 9)
+**Next Review**: End of Epic 4 (Week 12)
 
 **Recent Updates**:
-- Added Story 3.6: Placeholder Validation & Missing Placeholder Warnings (completed 2025-11-06)
-- Added FR41-FR43: Placeholder validation functional requirements
-- Documented placeholder detection and case-insensitive substitution implementation
-- Reference: [docs/PLACEHOLDER-VALIDATION-IMPLEMENTATION.md](PLACEHOLDER-VALIDATION-IMPLEMENTATION.md) for detailed implementation summary
-- Updated project phase: 13 stories completed (Epic 1: 4/5, Epic 2: 3/5, Epic 3: 6/7)
+- Completed Story 1.5a: Third-Party API Setup (2025-11-06) - All LLM providers (OpenAI, Anthropic, Gemini) configured and verified
+- Completed Story 4.1: LLM Abstraction Layer (2025-11-06) - Full provider implementation with normalized responses, cost calculation, retry logic
+- Fixed Gemini API key lookup issue in config.py
+- All three LLM providers tested and operational with test generations
+- Updated project phase: 15 stories completed (Epic 1: 5/6, Epic 2: 3/5, Epic 3: 6/7, Epic 4: 1/6)
+- Overall progress: 15/30 stories (50% complete)
+- Reference: [docs/PLACEHOLDER-VALIDATION-IMPLEMENTATION.md](PLACEHOLDER-VALIDATION-IMPLEMENTATION.md) for Story 3.6 implementation details
 
 This architecture document will be updated as implementation progresses and technical decisions are made. All unknowns and risks should be resolved and documented in updates to this file.

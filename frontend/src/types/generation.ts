@@ -122,3 +122,23 @@ export interface GenerationHistoryFilters {
   limit?: number;
   skip?: number;
 }
+
+/**
+ * Version tracking for iterative refinement (Story 4.5)
+ */
+export interface GenerationVersion {
+  version: number;
+  result: GenerationResult;
+  timestamp: string;
+  prompt_used: string;
+  is_selected: boolean;
+}
+
+/**
+ * Extended GenerationResult with version metadata
+ */
+export interface VersionedGenerationResult extends GenerationResult {
+  version?: number;
+  total_versions?: number;
+  is_selected_version?: boolean;
+}
