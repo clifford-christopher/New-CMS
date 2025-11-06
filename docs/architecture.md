@@ -15,14 +15,15 @@ This architecture document is **focused on the planned News CMS implementation**
 
 ### Document Status
 
-**Project Phase**: Epic 3 - Prompt Engineering Workspace (Stories 3.1-3.4b completed, 12 total stories complete)
+**Project Phase**: Epic 3 - Prompt Engineering Workspace (Stories 3.1-3.4b, 3.6 completed, 13 total stories complete)
 
-**Last Updated**: 2025-11-04
+**Last Updated**: 2025-11-06
 
 ### Change Log
 
 | Date       | Version | Description                                                          | Author  |
 |------------|---------|----------------------------------------------------------------------|---------|
+| 2025-11-06 | 1.3     | Added Story 3.6: Placeholder Validation & Missing Placeholder Warnings (completed) | Claude  |
 | 2025-11-04 | 1.2     | Updated completion status for 12 stories (Epic 1: 1.1-1.4, Epic 2: 2.1, 2.3, 2.5, Epic 3: 3.1-3.4b) | Claude  |
 | 2025-11-04 | 1.1     | Added version selection in preview (Story 3.4b)                      | Claude  |
 | 2025-10-29 | 1.0     | Initial architecture document                                        | Winston |
@@ -893,6 +894,18 @@ USE_MOCK_DATA=false  # Set to true to bypass real API calls
   - frontend/src/components/config/PreviewModal.tsx
   - frontend/src/types/preview.ts
 
+**Story 3.6 - Placeholder Validation & Missing Placeholder Warnings** (COMPLETED 2025-11-06):
+- Frontend placeholder detection: `hasPlaceholders()` function using regex patterns
+- Warning banners in PromptEditor and TestGenerationPanel for missing placeholders
+- Enhanced validation: supports string section IDs ('old_data'), multiple formats, case-insensitive matching
+- Backend case-insensitive placeholder substitution using regex matching
+- Prevents LLM from generating unrelated content due to empty templates
+- Files modified:
+  - frontend/src/components/config/PromptEditor.tsx (lines 191-199, 289-297)
+  - frontend/src/components/config/TestGenerationPanel.tsx (lines 27-37, 161-169)
+  - frontend/src/lib/placeholderUtils.ts (lines 69-89)
+  - backend/app/services/news_generation_service.py (lines 212-235)
+
 ⚠️ **Story 1.5a - Third-Party API Setup** (IN PROGRESS):
 - API key acquisition process documented
 - test-api-keys.py script created for validation
@@ -1557,14 +1570,15 @@ db.configurations.find({ is_active: true }).pretty()
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2025-11-04
+**Document Version**: 1.3
+**Last Updated**: 2025-11-06
 **Next Review**: End of Epic 3 (Week 9)
 
 **Recent Updates**:
-- Added Story 3.4b: Prompt Version Selection in Preview (completed)
-- Documented trigger_prompt_drafts collection schema
-- Added version management API endpoints
-- Updated project phase to Epic 3
+- Added Story 3.6: Placeholder Validation & Missing Placeholder Warnings (completed 2025-11-06)
+- Added FR41-FR43: Placeholder validation functional requirements
+- Documented placeholder detection and case-insensitive substitution implementation
+- Reference: [docs/PLACEHOLDER-VALIDATION-IMPLEMENTATION.md](PLACEHOLDER-VALIDATION-IMPLEMENTATION.md) for detailed implementation summary
+- Updated project phase: 13 stories completed (Epic 1: 4/5, Epic 2: 3/5, Epic 3: 6/7)
 
 This architecture document will be updated as implementation progresses and technical decisions are made. All unknowns and risks should be resolved and documented in updates to this file.

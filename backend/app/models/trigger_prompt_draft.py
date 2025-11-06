@@ -12,7 +12,7 @@ the published trigger_prompts collection, enabling:
 
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 
 class PromptTemplate(BaseModel):
@@ -33,11 +33,28 @@ class TriggerPromptDraft(BaseModel):
     """
     Model for prompt draft documents in trigger_prompt_drafts collection
 
-    Single document contains ALL prompt types (paid, unpaid, crawler) for a trigger.
+    Single document contains ALL configuration for a trigger:
+    - Prompt templates (paid, unpaid, crawler)
+    - Model configuration (selected models, temperature, max_tokens)
+    - Data configuration (data mode, selected sections)
+
     Each save creates a new version, preserving full history.
     """
     trigger_name: str = Field(..., description="Trigger identifier (e.g., '52wk_high')")
     prompts: PromptTemplates = Field(..., description="All prompt templates (paid, unpaid, crawler)")
+
+    # Model configuration (added for complete draft storage)
+    model_config_data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="LLM model configuration (selected_models, temperature, max_tokens)"
+    )
+
+    # Data configuration (added for complete draft storage)
+    data_config: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Data configuration (data_mode, selected_sections, section_order)"
+    )
+
     saved_by: str = Field(default="system", description="User ID who saved this draft")
     saved_at: datetime = Field(default_factory=datetime.utcnow, description="When this draft was saved")
     is_draft: bool = Field(default=True, description="Whether this is a draft (unpublished)")
@@ -64,6 +81,16 @@ class TriggerPromptDraft(BaseModel):
                         "character_count": 380,
                         "word_count": 63
                     }
+                },
+                "model_config_data": {
+                    "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                },
+                "data_config": {
+                    "data_mode": "NEW",
+                    "selected_sections": [1, 2, 3],
+                    "section_order": [2, 3, 1]
                 },
                 "saved_by": "user123",
                 "saved_at": "2025-11-04T10:30:00Z",

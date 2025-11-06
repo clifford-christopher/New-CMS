@@ -23,7 +23,11 @@ import { PromptProvider, usePrompt } from '@/contexts/PromptContext';
 import { ValidationProvider } from '@/contexts/ValidationContext';
 import { PreviewProvider } from '@/contexts/PreviewContext';
 import { DataProvider } from '@/contexts/DataContext';
+import { ModelProvider } from '@/contexts/ModelContext';
+import { GenerationProvider } from '@/contexts/GenerationContext';
 import { SectionData } from '@/types/validation';
+import ModelSelection from '@/components/config/ModelSelection';
+import TestGenerationPanel from '@/components/config/TestGenerationPanel';
 
 interface PageProps {
   params: { triggerId: string };
@@ -130,6 +134,51 @@ export default function ConfigurationPage({ params }: PageProps) {
     // Default: empty array if no data available yet
     return [];
   }, [dataMode, selectedSectionIds, newSectionsData, oldData]);
+
+  // Load draft configuration on mount
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/drafts/latest`);
+
+        if (!response.ok) {
+          console.warn('Failed to load draft configuration');
+          return;
+        }
+
+        const result = await response.json();
+
+        if (result.has_draft && result.draft) {
+          const draft = result.draft;
+          console.log('Loaded draft configuration:', draft);
+
+          // Load data configuration if available
+          if (draft.data_config) {
+            const dataConfig = draft.data_config;
+
+            // Set data mode
+            if (dataConfig.data_mode) {
+              setDataMode(dataConfig.data_mode as DataMode);
+            }
+
+            // Set selected sections
+            if (dataConfig.selected_sections && Array.isArray(dataConfig.selected_sections)) {
+              setSelectedSectionIds(dataConfig.selected_sections);
+            }
+          }
+
+          // Note: Prompts and model config are loaded separately through their respective contexts
+          // PromptContext loads prompts via loadPrompts()
+          // ModelContext loads model config via loadModelConfig()
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+        // Don't show error to user - it's okay if no draft exists yet
+      }
+    };
+
+    loadDraft();
+  }, [triggerId]);
 
   // Reset state when stock ID changes
   useEffect(() => {
@@ -330,15 +379,45 @@ export default function ConfigurationPage({ params }: PageProps) {
   // Save draft
   const handleSaveDraft = async () => {
     setSaveStatus('saving');
+    setErrorMessage('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Build draft payload from current page state
+      // Note: This saves the structure to drafts. Prompts and model config
+      // are saved separately through their respective contexts.
+      const draftPayload = {
+        prompts: {}, // Prompts are managed by PromptContext, saved separately
+        model_config: {}, // Model config managed by ModelContext, saved separately
+        data_config: {
+          data_mode: dataMode,
+          selected_sections: selectedSectionIds,
+          section_order: selectedSectionIds
+        },
+        saved_by: "system" // TODO: Replace with actual user ID when auth is implemented
+      };
+
+      const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(draftPayload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to save draft');
+      }
+
+      const result = await response.json();
+      console.log('Draft saved:', result);
+
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
+      console.error('Save draft error:', error);
       setSaveStatus('error');
-      setErrorMessage('Failed to save draft');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to save draft');
     }
   };
 
@@ -351,31 +430,30 @@ export default function ConfigurationPage({ params }: PageProps) {
     }
 
     setSaveStatus('saving');
+    setErrorMessage('');
 
     try {
-      const configuration = {
-        trigger_id: triggerId,
-        data_mode: dataMode,
-        selected_sections: selectedSectionIds,
-        section_order: selectedSectionIds,
-        prompt_types: Object.entries(promptTypes)
-          .filter(([_, enabled]) => enabled)
-          .map(([type]) => type)
-      };
-
-      const response = await fetch(`http://localhost:8000/api/triggers/${triggerId}/config`, {
+      // Call the new publish endpoint which copies draft to production
+      const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/publish`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(configuration)
+        body: JSON.stringify({
+          published_by: "system" // TODO: Replace with actual user ID when auth is implemented
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to publish configuration');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to publish configuration');
       }
 
+      const result = await response.json();
+      console.log('Configuration published:', result);
+
       setSaveStatus('success');
+      alert(`Configuration published successfully! Version ${result.draft_version_published} is now live.`);
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('Publish error:', error);
@@ -473,8 +551,9 @@ export default function ConfigurationPage({ params }: PageProps) {
         </div>
 
         {/* Main Content Area */}
-        <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
-          {/* Trigger Context Bar */}
+        <PromptProvider>
+          <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
+            {/* Trigger Context Bar */}
           <div style={{
             background: '#ffffff',
             borderRadius: '8px',
@@ -1245,7 +1324,25 @@ export default function ConfigurationPage({ params }: PageProps) {
             </div>
           )}
 
-          {(activeStep === 'testing' || activeStep === 'results') && (
+          {activeStep === 'testing' && (
+            <DataProvider
+              selectedSections={selectedSections}
+              dataMode={dataMode}
+              stockId={stockId}
+              triggerId={triggerId}
+            >
+              <TestingStepWrapper promptTypes={promptTypes}>
+                <ModelProvider triggerId={triggerId}>
+                  <GenerationProvider>
+                    <ModelSelection />
+                    <TestGenerationPanel />
+                  </GenerationProvider>
+                </ModelProvider>
+              </TestingStepWrapper>
+            </DataProvider>
+          )}
+
+          {activeStep === 'results' && (
             <div style={{
               background: '#ffffff',
               borderRadius: '8px',
@@ -1260,7 +1357,8 @@ export default function ConfigurationPage({ params }: PageProps) {
               </p>
             </div>
           )}
-        </div>
+          </div>
+        </PromptProvider>
       </div>
 
       {/* Sticky Bottom Actions Bar */}
@@ -1373,13 +1471,11 @@ function PromptEditorWrapper({
       stockId={stockId}
       triggerId={triggerId}
     >
-      <PromptProvider>
-        <ValidationProvider>
-          <PreviewProvider>
-            <PromptEditorContent triggerId={triggerId} checkedTypes={checkedTypes} />
-          </PreviewProvider>
-        </ValidationProvider>
-      </PromptProvider>
+      <ValidationProvider>
+        <PreviewProvider>
+          <PromptEditorContent triggerId={triggerId} checkedTypes={checkedTypes} />
+        </PreviewProvider>
+      </ValidationProvider>
     </DataProvider>
   );
 }
@@ -1398,4 +1494,25 @@ function PromptEditorContent({ triggerId, checkedTypes }: PromptEditorWrapperPro
   }, [checkedTypes, setCheckedTypes]);
 
   return <PromptEditor triggerId={triggerId} />;
+}
+
+// Wrapper component for Testing step to sync prompt types
+interface TestingStepWrapperProps {
+  promptTypes: Record<PromptType, boolean>;
+  children: React.ReactNode;
+}
+
+function TestingStepWrapper({ promptTypes, children }: TestingStepWrapperProps) {
+  const { setCheckedTypes } = usePrompt();
+
+  // Sync checked types with PromptContext
+  useEffect(() => {
+    const types = new Set<'paid' | 'unpaid' | 'crawler'>();
+    types.add('paid'); // Always include paid
+    if (promptTypes.unpaid) types.add('unpaid');
+    if (promptTypes.webCrawler) types.add('crawler');
+    setCheckedTypes(types);
+  }, [promptTypes, setCheckedTypes]);
+
+  return <>{children}</>;
 }

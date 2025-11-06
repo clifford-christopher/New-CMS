@@ -188,6 +188,16 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
 
   const currentPrompt = prompts[activeTab];
 
+  // Check if prompt has placeholders
+  const hasPlaceholders = (content: string): boolean => {
+    // Check for {{section}} or {data.field} patterns
+    const sectionPattern = /\{\{[a-zA-Z_][a-zA-Z0-9_\s]*\}\}/;
+    const dataPattern = /\{data\.[a-zA-Z_][a-zA-Z0-9_.]*\}/;
+    return sectionPattern.test(content) || dataPattern.test(content);
+  };
+
+  const showPlaceholderWarning = currentPrompt.content.trim().length > 0 && !hasPlaceholders(currentPrompt.content);
+
   // Handle save button click with success notification
   const handleSaveClick = async () => {
     try {
@@ -285,6 +295,16 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
             For example, <code>{'{{section_1}}'}</code> for a section or <code>{'{data.field}'}</code> for a data field.
             Start typing <code>{'{{'}}</code> to see autocomplete suggestions.
           </Alert>
+
+          {showPlaceholderWarning && (
+            <Alert variant="warning" className="m-3 mb-0">
+              <i className="bi bi-exclamation-triangle me-2"></i>
+              <strong>Warning:</strong> Your prompt template contains no placeholders!
+              Without placeholders like <code>{'{{old_data}}'}</code> or <code>{'{{section_1}}'}</code>,
+              the LLM will not receive any of your configured data and may generate unrelated content.
+              Add placeholders to inject your structured data into the prompt.
+            </Alert>
+          )}
 
           <div className="mx-3 mb-3">
             <PlaceholderDocumentation />

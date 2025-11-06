@@ -24,6 +24,7 @@ The News CMS will transform this process by providing a visual, interactive inte
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
+| 2025-11-06 | 1.3 | Added FR41-FR43: Placeholder validation and template handling features | Claude |
 | 2025-11-04 | 1.2 | Updated completion status for Stories 1.1-1.4, 2.1, 2.3, 2.5, 3.1-3.4, 3.4b | Claude |
 | 2025-11-04 | 1.1 | Added Story 3.4b: Version Selection in Preview (completed) | Claude |
 | 2025-10-24 | 1.0 | Initial PRD created from project brief | John (PM Agent) |
@@ -72,6 +73,9 @@ The News CMS will transform this process by providing a visual, interactive inte
 - **FR38**: The system shall provide a tabbed interface for editing prompts, allowing users to switch between paid, unpaid, and crawler prompt types
 - **FR39**: The system shall generate news only for checked/selected prompt types
 - **FR40**: The system shall display actual token usage, generation time, and cost per model per prompt type after generation completes
+- **FR41**: The system shall display warning messages when prompt templates contain no placeholders to prevent generation of unrelated content
+- **FR42**: The system shall validate placeholders with support for string section IDs (like 'old_data'), case-insensitive section names, and multiple placeholder formats
+- **FR43**: The system shall perform case-insensitive placeholder substitution in backend to handle placeholder variations (e.g., {{OLD Data}} matching section key "old_data")
 
 ### Non Functional
 
@@ -596,9 +600,9 @@ Enable publishing of tested configurations to production with validation, audit 
 
 **Goal**: Create the prompt editing environment where content managers craft and refine prompts using real data. This epic delivers the core creative workspace with section management, tabbed prompt editor for multiple types (paid, unpaid, crawler), syntax-highlighted editing, real-time validation, and preview capabilities—enabling rapid prompt iteration without developer dependency. **Note**: Section management is shared across all prompt types, but each type has its own independent prompt template accessible via tabs.
 
-**Stories**: ✅ 3.1 (COMPLETED), ✅ 3.2 (COMPLETED), ✅ 3.3 (COMPLETED), ✅ 3.4 (COMPLETED), ✅ 3.4b (COMPLETED 2025-11-04), 3.5 (In Progress)
+**Stories**: ✅ 3.1 (COMPLETED), ✅ 3.2 (COMPLETED), ✅ 3.3 (COMPLETED), ✅ 3.4 (COMPLETED), ✅ 3.4b (COMPLETED 2025-11-04), 3.5 (In Progress), ✅ 3.6 (COMPLETED 2025-11-06)
 
-**Status**: Stories 3.1-3.4b completed - full prompt workspace with section reordering, Monaco editor integration with syntax highlighting and validation, preview with data substitution, and version selection. Story 3.5 (Version History UI) partially complete (backend done, frontend UI pending).
+**Status**: Stories 3.1-3.4b, 3.6 completed - full prompt workspace with section reordering, Monaco editor integration with syntax highlighting and validation, preview with data substitution, version selection, and comprehensive placeholder validation with missing placeholder warnings. Story 3.5 (Version History UI) partially complete (backend done, frontend UI pending).
 
 ### Story 3.1: Section Reordering Interface (Shared Across All Prompt Types) ✅ COMPLETED
 
@@ -726,6 +730,42 @@ Enable publishing of tested configurations to production with validation, audit 
 8. Clear indication of current version vs. historical versions
 9. "Save as New Version" button allows explicitly checkpointing important prompt iterations per type
 10. History dropdown or panel shows which prompt type's history is being displayed based on active tab
+
+### Story 3.6: Placeholder Validation & Missing Placeholder Warnings ✅ COMPLETED (2025-11-06)
+
+**As a** content manager,
+**I want** comprehensive placeholder validation with warnings for missing placeholders,
+**so that** I can prevent LLM from generating unrelated content due to empty prompt templates.
+
+**Acceptance Criteria**:
+1. ✅ Frontend validation supports string section IDs (e.g., 'old_data') in addition to numeric IDs (1-14)
+2. ✅ Validation accepts multiple placeholder formats: {{old_data}}, {{section_old_data}}, {{OLD Data}}, {{1}}, {{section_1}}
+3. ✅ Case-insensitive section name matching ({{OLD Data}} matches section "old_data")
+4. ✅ Warning banner displayed in PromptEditor when prompt has content but no placeholders
+5. ✅ Warning banner displayed in TestGenerationPanel listing which prompt types lack placeholders
+6. ✅ Placeholder detection uses regex patterns: /\{\{[a-zA-Z_][a-zA-Z0-9_\s]*\}\}/ for sections, /\{data\.[a-zA-Z_][a-zA-Z0-9_.]*\}/ for fields
+7. ✅ Backend performs case-insensitive placeholder substitution using regex matching
+8. ✅ Backend matches {{OLD Data}} with section key "old_data" via case-insensitive comparison
+9. ✅ Meets FR41: warning messages prevent generation of unrelated content
+10. ✅ Meets FR42: validation supports string IDs, case-insensitive names, multiple formats
+11. ✅ Meets FR43: backend case-insensitive substitution handles placeholder variations
+
+**Implementation Details**:
+- **Files Modified**:
+  - [frontend/src/components/config/PromptEditor.tsx](frontend/src/components/config/PromptEditor.tsx) (lines 191-199, 289-297)
+  - [frontend/src/components/config/TestGenerationPanel.tsx](frontend/src/components/config/TestGenerationPanel.tsx) (lines 27-37, 161-169)
+  - [frontend/src/lib/placeholderUtils.ts](frontend/src/lib/placeholderUtils.ts) (lines 69-89)
+  - [backend/app/services/news_generation_service.py](backend/app/services/news_generation_service.py) (lines 212-235)
+
+- **Key Features**:
+  - Placeholder detection function: `hasPlaceholders(content: string): boolean`
+  - Frontend validation: Direct section_id match added to `validateSectionPlaceholder()`
+  - Backend substitution: Exact match + case-insensitive regex matching with `re.finditer()`
+
+- **User Impact**:
+  - Prevents empty prompt templates from generating unrelated content
+  - Flexible placeholder format support reduces user errors
+  - Case-insensitive matching improves user experience
 
 ## Epic 4: Multi-Model Generation & Testing
 

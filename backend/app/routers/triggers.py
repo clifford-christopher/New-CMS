@@ -694,3 +694,461 @@ async def get_prompt_version(trigger_name: str, version_number: int):
     except Exception as e:
         logger.error(f"Failed to retrieve version {version_number} for trigger '{trigger_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve version: {str(e)}")
+
+
+@router.post("/{trigger_name}/config/models")
+async def update_model_config(trigger_name: str, model_config: dict):
+    """
+    Update model selection configuration for trigger (saves to DRAFT).
+
+    This endpoint stores the selected LLM models, temperature, and max_tokens in the
+    draft collection. Model selection is shared across all prompt types
+    (paid, unpaid, crawler) for this trigger.
+
+    NOTE: This saves to trigger_prompt_drafts, not trigger_prompts.
+    Use the publish endpoint to make changes live.
+
+    Args:
+        trigger_name: Trigger identifier
+        model_config: Configuration object with:
+            - selected_models: List of model IDs (e.g., ["gpt-4o", "claude-sonnet-4-5"])
+            - temperature: Generation temperature (0.0-1.0)
+            - max_tokens: Maximum tokens to generate (50-4000)
+
+    Example:
+        ```json
+        {
+            "selected_models": ["gpt-4o", "claude-sonnet-4-5", "gemini-2.0-flash"],
+            "temperature": 0.7,
+            "max_tokens": 500
+        }
+        ```
+
+    Returns:
+        dict: Updated draft configuration and success message
+
+    Raises:
+        HTTPException: 400 if validation fails, 503 if database not connected
+    """
+    try:
+        db = get_database()
+
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
+        # Extract and validate configuration
+        selected_models = model_config.get("selected_models", [])
+        temperature = model_config.get("temperature", 0.7)
+        max_tokens = model_config.get("max_tokens", 500)
+
+        # Validation: At least one model required
+        if not selected_models or not isinstance(selected_models, list) or len(selected_models) == 0:
+            raise HTTPException(status_code=400, detail="At least one model must be selected")
+
+        # Validation: Temperature range (0.0 - 1.0)
+        if not isinstance(temperature, (int, float)) or temperature < 0.0 or temperature > 1.0:
+            raise HTTPException(status_code=400, detail="Temperature must be between 0.0 and 1.0")
+
+        # Validation: Max tokens range (50 - 4000)
+        if not isinstance(max_tokens, int) or max_tokens < 50 or max_tokens > 4000:
+            raise HTTPException(status_code=400, detail="Max tokens must be between 50 and 4000")
+
+        # Validate model IDs against available models
+        from ..llm_providers import ProviderRegistry
+        available_models = ProviderRegistry.list_available_models()
+        available_model_ids = {model["model_id"] for model in available_models}
+
+        invalid_models = [model_id for model_id in selected_models if model_id not in available_model_ids]
+        if invalid_models:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model IDs: {', '.join(invalid_models)}. Use /api/news/models to see available models."
+            )
+
+        # Build model_config_data object
+        model_config_data = {
+            "selected_models": selected_models,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "updated_at": datetime.utcnow()
+        }
+
+        # Find latest draft for this trigger
+        latest_draft = await db.trigger_prompt_drafts.find_one(
+            {"trigger_name": trigger_name},
+            sort=[("version", -1)]
+        )
+
+        if latest_draft:
+            # Update existing draft
+            update_result = await db.trigger_prompt_drafts.update_one(
+                {"_id": latest_draft["_id"]},
+                {
+                    "$set": {
+                        "model_config_data": model_config_data,
+                        "saved_at": datetime.utcnow()
+                    }
+                }
+            )
+            version = latest_draft.get("version", 1)
+            logger.info(f"Updated draft version {version} with model config for trigger '{trigger_name}'")
+        else:
+            # No draft exists, create a new one with just model config
+            # (prompts will be added when they are configured)
+            new_draft = {
+                "trigger_name": trigger_name,
+                "prompts": {},  # Empty prompts, will be filled later
+                "model_config_data": model_config_data,
+                "data_config": None,
+                "saved_by": "system",
+                "saved_at": datetime.utcnow(),
+                "is_draft": True,
+                "version": 1,
+                "session_id": None
+            }
+            result = await db.trigger_prompt_drafts.insert_one(new_draft)
+            version = 1
+            logger.info(f"Created new draft (version 1) with model config for trigger '{trigger_name}'")
+
+        logger.info(
+            f"Saved model config to draft for trigger '{trigger_name}': "
+            f"{len(selected_models)} model(s), temp={temperature}, max_tokens={max_tokens}"
+        )
+
+        return {
+            "success": True,
+            "message": f"Model configuration saved to draft for '{trigger_name}'",
+            "model_config": model_config_data,
+            "models_count": len(selected_models),
+            "is_draft": True,
+            "version": version
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update model config for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update model configuration: {str(e)}")
+
+
+@router.get("/{trigger_name}/config/models")
+async def get_model_config(trigger_name: str):
+    """
+    Get current model configuration for a trigger.
+
+    Retrieves the model selection from the LATEST DRAFT first, then falls back
+    to published configuration if no draft exists.
+
+    Args:
+        trigger_name: Trigger identifier
+
+    Returns:
+        dict: Current model configuration or default values if not set
+
+    Raises:
+        HTTPException: 503 if database not connected
+    """
+    try:
+        db = get_database()
+
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
+        # Try to find latest draft first (preferred)
+        draft_doc = await db.trigger_prompt_drafts.find_one(
+            {"trigger_name": trigger_name},
+            sort=[("version", -1)]
+        )
+
+        model_config_data = None
+        is_draft = False
+
+        if draft_doc and draft_doc.get("model_config_data"):
+            # Use draft configuration
+            model_config_data = draft_doc.get("model_config_data", {})
+            is_draft = True
+        else:
+            # Fall back to published configuration
+            trigger_doc = await db.trigger_prompts.find_one({"trigger_name": trigger_name})
+            if trigger_doc:
+                model_config_data = trigger_doc.get("model_config_data", {})
+                is_draft = False
+
+        # Return defaults if no configuration found
+        if not model_config_data:
+            return {
+                "trigger_name": trigger_name,
+                "model_config": {
+                    "selected_models": [],
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                    "updated_at": None
+                },
+                "is_configured": False,
+                "is_draft": False,
+                "message": "No model configuration set. Use POST to configure models."
+            }
+
+        return {
+            "trigger_name": trigger_name,
+            "model_config": {
+                "selected_models": model_config_data.get("selected_models", []),
+                "temperature": model_config_data.get("temperature", 0.7),
+                "max_tokens": model_config_data.get("max_tokens", 500),
+                "updated_at": model_config_data.get("updated_at").isoformat() if model_config_data.get("updated_at") else None
+            },
+            "is_configured": True,
+            "is_draft": is_draft,
+            "models_count": len(model_config_data.get("selected_models", []))
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retrieve model config for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve model configuration: {str(e)}")
+
+
+@router.post("/{trigger_name}/drafts")
+async def save_complete_draft(trigger_name: str, draft_data: dict):
+    """
+    Save complete trigger configuration to drafts (unified endpoint).
+
+    This endpoint saves ALL configuration atomically:
+    - Prompts (paid, unpaid, crawler)
+    - Model configuration (selected_models, temperature, max_tokens)
+    - Data configuration (data_mode, selected_sections, section_order)
+
+    Expected payload:
+    {
+        "prompts": {
+            "paid": {"template": "...", "character_count": 0, "word_count": 0},
+            "unpaid": {...},
+            "crawler": {...}
+        },
+        "model_config": {
+            "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
+            "temperature": 0.7,
+            "max_tokens": 500
+        },
+        "data_config": {
+            "data_mode": "NEW",
+            "selected_sections": [1, 2, 3],
+            "section_order": [2, 3, 1]
+        },
+        "saved_by": "user123"  // optional
+    }
+
+    This saves to trigger_prompt_drafts. Use /publish endpoint to make changes live.
+    """
+    try:
+        # Extract components from payload
+        prompts_data = draft_data.get("prompts", {})
+        model_config = draft_data.get("model_config", {})
+        data_config = draft_data.get("data_config", {})
+        saved_by = draft_data.get("saved_by", "system")
+
+        # Validate trigger exists
+        trigger_doc = await db.trigger_prompts.find_one({"trigger_name": trigger_name})
+        if not trigger_doc:
+            raise HTTPException(status_code=404, detail=f"Trigger '{trigger_name}' not found")
+
+        # Find latest draft for this trigger
+        latest_draft = await db.trigger_prompt_drafts.find_one(
+            {"trigger_name": trigger_name},
+            sort=[("version", -1)]
+        )
+
+        # Prepare complete draft document
+        draft_document = {
+            "trigger_name": trigger_name,
+            "prompts": prompts_data,
+            "model_config_data": model_config if model_config else None,
+            "data_config": data_config if data_config else None,
+            "saved_by": saved_by,
+            "saved_at": datetime.utcnow(),
+            "is_draft": True,
+            "session_id": draft_data.get("session_id", None)
+        }
+
+        if latest_draft:
+            # Update existing draft (in place - same version)
+            update_result = await db.trigger_prompt_drafts.update_one(
+                {"_id": latest_draft["_id"]},
+                {"$set": draft_document}
+            )
+            version = latest_draft.get("version", 1)
+            logger.info(f"Updated complete draft version {version} for trigger '{trigger_name}'")
+        else:
+            # Create new draft (version 1)
+            draft_document["version"] = 1
+            result = await db.trigger_prompt_drafts.insert_one(draft_document)
+            version = 1
+            logger.info(f"Created new complete draft (version 1) for trigger '{trigger_name}'")
+
+        return {
+            "success": True,
+            "message": f"Complete draft saved for '{trigger_name}'",
+            "trigger_name": trigger_name,
+            "version": version,
+            "is_draft": True,
+            "saved_at": draft_document["saved_at"].isoformat(),
+            "components_saved": {
+                "prompts": len(prompts_data),
+                "model_config": bool(model_config),
+                "data_config": bool(data_config)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to save complete draft for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save draft: {str(e)}")
+
+
+@router.post("/{trigger_name}/publish")
+async def publish_draft(trigger_name: str, publish_data: dict = None):
+    """
+    Publish a draft configuration to production.
+
+    This endpoint copies the latest draft from trigger_prompt_drafts to trigger_prompts,
+    making the configuration live. This includes:
+    - Prompts (paid, unpaid, crawler)
+    - Model configuration (selected_models, temperature, max_tokens)
+    - Data configuration (data_mode, selected_sections, section_order)
+
+    Optional payload:
+    {
+        "published_by": "user123"  // optional, who published
+    }
+
+    After publishing, the draft remains in trigger_prompt_drafts for history tracking.
+    """
+    try:
+        # Find latest draft for this trigger
+        latest_draft = await db.trigger_prompt_drafts.find_one(
+            {"trigger_name": trigger_name},
+            sort=[("version", -1)]
+        )
+
+        if not latest_draft:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No draft found for trigger '{trigger_name}'. Save a draft first before publishing."
+            )
+
+        # Extract published_by from payload if provided
+        published_by = "system"
+        if publish_data and isinstance(publish_data, dict):
+            published_by = publish_data.get("published_by", "system")
+
+        # Check if trigger exists in production
+        existing_trigger = await db.trigger_prompts.find_one({"trigger_name": trigger_name})
+
+        if not existing_trigger:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Trigger '{trigger_name}' not found in trigger_prompts collection"
+            )
+
+        # Prepare published document (copy from draft)
+        published_document = {
+            "trigger_name": trigger_name,
+            "prompts": latest_draft.get("prompts", {}),
+            "model_config_data": latest_draft.get("model_config_data"),
+            "data_config": latest_draft.get("data_config"),
+            "published_by": published_by,
+            "published_at": datetime.utcnow(),
+            "is_draft": False,
+            "draft_version_published": latest_draft.get("version", 1)
+        }
+
+        # Update the trigger_prompts collection
+        update_result = await db.trigger_prompts.update_one(
+            {"trigger_name": trigger_name},
+            {"$set": published_document}
+        )
+
+        if update_result.modified_count == 0:
+            logger.warning(f"No changes made when publishing draft for trigger '{trigger_name}'")
+
+        logger.info(f"Published draft version {latest_draft.get('version', 1)} for trigger '{trigger_name}'")
+
+        # Optionally increment draft version for next draft
+        # This creates a clean slate for the next round of edits
+        await db.trigger_prompt_drafts.update_one(
+            {"_id": latest_draft["_id"]},
+            {"$inc": {"version": 1}}
+        )
+
+        return {
+            "success": True,
+            "message": f"Draft published successfully for '{trigger_name}'",
+            "trigger_name": trigger_name,
+            "published_at": published_document["published_at"].isoformat(),
+            "draft_version_published": latest_draft.get("version", 1),
+            "published_by": published_by,
+            "components_published": {
+                "prompts": len(latest_draft.get("prompts", {})),
+                "model_config": bool(latest_draft.get("model_config_data")),
+                "data_config": bool(latest_draft.get("data_config"))
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to publish draft for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to publish draft: {str(e)}")
+
+
+@router.get("/{trigger_name}/drafts/latest")
+async def get_latest_draft(trigger_name: str):
+    """
+    Get the latest draft configuration for a trigger.
+
+    Returns the complete draft including:
+    - Prompts (paid, unpaid, crawler)
+    - Model configuration
+    - Data configuration
+    - Version and metadata
+
+    Used by frontend to load existing draft when page mounts.
+    """
+    try:
+        # Find latest draft for this trigger
+        latest_draft = await db.trigger_prompt_drafts.find_one(
+            {"trigger_name": trigger_name},
+            sort=[("version", -1)]
+        )
+
+        if not latest_draft:
+            # No draft exists - return empty structure
+            return {
+                "success": True,
+                "has_draft": False,
+                "trigger_name": trigger_name,
+                "message": "No draft found"
+            }
+
+        # Convert ObjectId to string for JSON serialization
+        latest_draft["_id"] = str(latest_draft["_id"])
+
+        # Convert datetime to ISO string
+        if "saved_at" in latest_draft and latest_draft["saved_at"]:
+            latest_draft["saved_at"] = latest_draft["saved_at"].isoformat()
+
+        return {
+            "success": True,
+            "has_draft": True,
+            "trigger_name": trigger_name,
+            "draft": latest_draft,
+            "version": latest_draft.get("version", 1),
+            "is_draft": latest_draft.get("is_draft", True),
+            "saved_at": latest_draft.get("saved_at")
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve latest draft for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve draft: {str(e)}")

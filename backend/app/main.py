@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 import logging
 from datetime import datetime
 from .database import connect_to_mongo, close_mongo_connection
-from .routers import health, triggers, stocks, data
+from .routers import health, triggers, stocks, data, generation
 
 # Configure logging
 logging.basicConfig(
@@ -102,12 +102,7 @@ app.include_router(health.router)
 app.include_router(triggers.router)  # Story 1.4: Trigger Management Dashboard
 app.include_router(stocks.router)  # Stock data from news_triggers collection
 app.include_router(data.router)  # Story 2.4: Structured data generation
-
-# TODO: Register additional routers (Story 2+)
-# from app.routers import configuration, data, generation
-# app.include_router(configuration.router, prefix="/api/config", tags=["Configuration"])
-# app.include_router(data.router, prefix="/api/data", tags=["Data"])
-# app.include_router(generation.router, prefix="/api/generation", tags=["Generation"])
+app.include_router(generation.router, prefix="/api", tags=["Generation"])  # Story 4.1: LLM Integration
 
 
 if __name__ == "__main__":
