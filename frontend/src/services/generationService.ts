@@ -10,7 +10,8 @@ import {
   GenerationResult,
   GenerationHistoryItem,
   GenerationHistoryFilters,
-  PromptType
+  PromptType,
+  VariantStrategy
 } from '@/types/generation';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -145,6 +146,7 @@ export function buildGenerationRequests(params: {
   temperature: number;
   maxTokens: number;
   sessionId?: string;
+  variantStrategy?: VariantStrategy;
 }): GenerationRequest[] {
   const {
     triggerId,
@@ -155,7 +157,8 @@ export function buildGenerationRequests(params: {
     structuredData,
     temperature,
     maxTokens,
-    sessionId
+    sessionId,
+    variantStrategy
   } = params;
 
   const requests: GenerationRequest[] = [];

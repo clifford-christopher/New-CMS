@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { VariantStrategy, validateStrategy, StrategyValidationResult, getVisibleTabs } from '@/types/generation';
 
 type PromptType = 'paid' | 'unpaid' | 'crawler';
 
@@ -31,6 +32,8 @@ interface PromptContextType {
   activeTab: PromptType;
   checkedTypes: Set<PromptType>;
   editorTheme: 'vs-light' | 'vs-dark';
+  variantStrategy: VariantStrategy;
+  strategyValidation: StrategyValidationResult;
   canUndo: (type: PromptType) => boolean;
   canRedo: (type: PromptType) => boolean;
   undo: (type: PromptType) => void;
@@ -39,6 +42,7 @@ interface PromptContextType {
   setActiveTab: (type: PromptType) => void;
   setCheckedTypes: (types: Set<PromptType>) => void;
   setEditorTheme: (theme: 'vs-light' | 'vs-dark') => void;
+  setVariantStrategy: (strategy: VariantStrategy) => void;
   savePrompts: (triggerId: string) => Promise<void>;
   loadPrompts: (triggerId: string) => Promise<void>;
   isSaving: boolean;
@@ -120,6 +124,7 @@ export function PromptProvider({ children }: { children: ReactNode }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [triggerId, setTriggerId] = useState<string | null>(null);
+  const [variantStrategy, setVariantStrategy] = useState<VariantStrategy>('all_same');
 
   // Initialize history from sessionStorage
   const [history, setHistory] = useState<Record<PromptType, PromptHistory>>({
@@ -128,6 +133,26 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     crawler: loadHistoryFromStorage('crawler')
   });
 
+  // Calculate strategy validation whenever prompts or strategy changes
+  const strategyValidation = useCallback((): StrategyValidationResult => {
+    return validateStrategy(variantStrategy, {
+      paid: { content: prompts.paid.content, enabled: true },
+      unpaid: { content: prompts.unpaid.content, enabled: true },
+      crawler: { content: prompts.crawler.content, enabled: true }
+    });
+  }, [prompts, variantStrategy])();
+
+  // Auto-update checkedTypes when variant strategy changes
+  useEffect(() => {
+    const visibleTabs = getVisibleTabs(variantStrategy);
+    const newCheckedTypes = new Set<PromptType>(visibleTabs);
+    setCheckedTypes(newCheckedTypes);
+
+    // If active tab is not in visible tabs, switch to first visible tab
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [variantStrategy]);
 
   // Load theme from localStorage on mount
   useEffect(() => {
@@ -321,7 +346,8 @@ export function PromptProvider({ children }: { children: ReactNode }) {
             paid: { template: prompts.paid.content },
             unpaid: { template: prompts.unpaid.content },
             crawler: { template: prompts.crawler.content }
-          }
+          },
+          variant_strategy: variantStrategy
         })
       });
 
@@ -391,6 +417,11 @@ export function PromptProvider({ children }: { children: ReactNode }) {
             ...calculateStats(extractTemplate(config.prompts.crawler))
           }
         });
+
+        // Load variant_strategy if available
+        if (config.variant_strategy) {
+          setVariantStrategy(config.variant_strategy as VariantStrategy);
+        }
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to load prompts');
@@ -402,6 +433,8 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     activeTab,
     checkedTypes,
     editorTheme,
+    variantStrategy,
+    strategyValidation,
     canUndo,
     canRedo,
     undo,
@@ -410,6 +443,7 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     setActiveTab,
     setCheckedTypes,
     setEditorTheme,
+    setVariantStrategy,
     savePrompts,
     loadPrompts,
     isSaving,

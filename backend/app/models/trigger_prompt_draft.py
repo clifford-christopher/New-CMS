@@ -13,6 +13,24 @@ the published trigger_prompts collection, enabling:
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, Dict, Any, List
+from enum import Enum
+
+
+class VariantStrategy(str, Enum):
+    """
+    Variant Strategy - Controls how prompts are used across news types to optimize API calls
+
+    - all_same: Use one prompt for all types (1 API call, most cost-effective)
+    - all_unique: Generate unique content for each type (3 API calls)
+    - paid_unique: Unique paid content, shared unpaid/crawler (2 API calls)
+    - unpaid_unique: Unique unpaid content, shared paid/crawler (2 API calls)
+    - crawler_unique: Unique crawler content, shared paid/unpaid (2 API calls)
+    """
+    ALL_SAME = "all_same"
+    ALL_UNIQUE = "all_unique"
+    PAID_UNIQUE = "paid_unique"
+    UNPAID_UNIQUE = "unpaid_unique"
+    CRAWLER_UNIQUE = "crawler_unique"
 
 
 class PromptTemplate(BaseModel):
@@ -55,6 +73,12 @@ class TriggerPromptDraft(BaseModel):
         description="Data configuration (data_mode, selected_sections, section_order)"
     )
 
+    # Variant strategy (controls how prompts are used across news types)
+    variant_strategy: VariantStrategy = Field(
+        default=VariantStrategy.ALL_SAME,
+        description="Strategy for using prompts across paid/unpaid/crawler news types"
+    )
+
     saved_by: str = Field(default="system", description="User ID who saved this draft")
     saved_at: datetime = Field(default_factory=datetime.utcnow, description="When this draft was saved")
     is_draft: bool = Field(default=True, description="Whether this is a draft (unpublished)")
@@ -92,6 +116,7 @@ class TriggerPromptDraft(BaseModel):
                     "selected_sections": [1, 2, 3],
                     "section_order": [2, 3, 1]
                 },
+                "variant_strategy": "all_unique",
                 "saved_by": "user123",
                 "saved_at": "2025-11-04T10:30:00Z",
                 "is_draft": True,

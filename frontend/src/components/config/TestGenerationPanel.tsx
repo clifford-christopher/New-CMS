@@ -3,7 +3,7 @@
  * Main panel for triggering test generation
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Alert, ProgressBar, Row, Col } from 'react-bootstrap';
 import { useGeneration } from '@/contexts/GenerationContext';
 import { useModel } from '@/contexts/ModelContext';
@@ -11,15 +11,51 @@ import { usePrompt } from '@/contexts/PromptContext';
 import { useData } from '@/contexts/DataContext';
 import { PromptType, StructuredData } from '@/types/generation';
 import GenerationResultsView from './GenerationResultsView';
+import VersionDropdown, { VersionOption } from './VersionDropdown';
 
 const TestGenerationPanel: React.FC = () => {
-  const { triggerGeneration, isGenerating, status, error, clearResults } = useGeneration();
+  const {
+    triggerGeneration,
+    isGenerating,
+    status,
+    error,
+    clearResults,
+    results,
+    fetchHistory,
+    historyLoading,
+    resultVersions,
+    selectedVersions,
+    selectVersion
+  } = useGeneration();
   const { selectedModels, temperature, maxTokens } = useModel();
-  const { checkedTypes, prompts } = usePrompt(); // Also extract prompts from context
+  const { checkedTypes, prompts, variantStrategy, strategyValidation } = usePrompt(); // Also extract prompts and strategy from context
   const { selectedSections, dataMode, stockId, triggerId } = useData();
 
   // Convert Set to Array for prompt types
   const promptTypesArray = Array.from(checkedTypes) as PromptType[];
+
+  // Build version dropdown options
+  const versionOptions: VersionOption[] = [];
+
+  resultVersions.forEach((versions, key) => {
+    versions.forEach((version, index) => {
+      const [modelId, promptType] = key.split('-');
+      versionOptions.push({
+        key: `${key}-v${version.version}`,
+        label: `v${version.version} - ${version.result.response.model_name} (${promptType}) - ${new Date(version.timestamp).toLocaleString()}`,
+        modelId,
+        promptType: promptType as PromptType,
+        versionIndex: index,
+        version: version.version,
+        timestamp: version.timestamp
+      });
+    });
+  });
+
+  // Sort by timestamp (newest first)
+  versionOptions.sort((a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   // Calculate total generations
   const totalGenerations = selectedModels.length * promptTypesArray.length;
@@ -44,7 +80,9 @@ const TestGenerationPanel: React.FC = () => {
     stockId &&
     !isGenerating &&
     // Verify all checked prompt types have non-empty content
-    promptTypesArray.every(type => prompts[type].content.trim().length > 0);
+    promptTypesArray.every(type => prompts[type].content.trim().length > 0) &&
+    // Verify variant strategy requirements are met
+    strategyValidation.isValid;
 
   // Build structured data from DataContext
   const buildStructuredData = (): StructuredData => {
@@ -84,7 +122,8 @@ const TestGenerationPanel: React.FC = () => {
         promptTemplates, // Pass in-memory prompt templates
         structuredData,
         temperature,
-        maxTokens
+        maxTokens,
+        variantStrategy // Pass variant strategy to generation service
       });
     } catch (err) {
       console.error('Generation failed:', err);
@@ -97,6 +136,13 @@ const TestGenerationPanel: React.FC = () => {
 
   return (
     <div className="test-generation-panel">
+      {/* Version History Dropdown */}
+      <VersionDropdown
+        versionOptions={versionOptions}
+        resultVersions={resultVersions}
+        isLoading={historyLoading}
+      />
+
       <Card className="mb-4">
         <Card.Header>
           <h5 className="mb-0">
@@ -177,6 +223,13 @@ const TestGenerationPanel: React.FC = () => {
             <Alert variant="warning">
               <i className="bi bi-exclamation-triangle me-2"></i>
               One or more prompt types have empty content. Please configure prompts in the Prompt Engineering step before generating.
+            </Alert>
+          )}
+
+          {!strategyValidation.isValid && (
+            <Alert variant="danger">
+              <i className="bi bi-exclamation-circle me-2"></i>
+              <strong>Variant Strategy Requirement Not Met:</strong> {strategyValidation.errorMessage}
             </Alert>
           )}
 

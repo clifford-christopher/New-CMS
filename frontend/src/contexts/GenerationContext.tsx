@@ -11,7 +11,10 @@ import {
   GenerationHistoryFilters,
   GenerationVersion,
   PromptType,
-  StructuredData
+  StructuredData,
+  VariantStrategy,
+  getPromptMapping,
+  getUniquePromptsForGeneration
 } from '@/types/generation';
 import { generateBatch, buildGenerationRequests, fetchGenerationHistory as fetchHistoryAPI } from '@/services/generationService';
 
@@ -22,6 +25,7 @@ interface GenerationContextValue {
   status: GenerationBatchStatus | null;
   error: string | null;
   sessionId: string | null;
+  triggerId: string | null;
 
   // History state
   history: GenerationHistoryItem[];
@@ -33,6 +37,7 @@ interface GenerationContextValue {
   selectedVersions: Map<string, number>;
 
   // Actions
+  setTriggerId: (id: string | null) => void;
   triggerGeneration: (params: GenerationParams) => Promise<void>;
   clearResults: () => void;
   getResultsByType: (promptType: PromptType) => GenerationResult[];
@@ -57,6 +62,7 @@ export interface GenerationParams {
   structuredData: StructuredData;
   temperature: number;
   maxTokens: number;
+  variantStrategy?: VariantStrategy; // Variant strategy for prompt mapping
 }
 
 const GenerationContext = createContext<GenerationContextValue | undefined>(undefined);
@@ -71,6 +77,7 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
   const [status, setStatus] = useState<GenerationBatchStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [triggerId, setTriggerId] = useState<string | null>(null);
 
   // History state
   const [history, setHistory] = useState<GenerationHistoryItem[]>([]);
@@ -84,6 +91,16 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
   // Store last generation params for regeneration
   const [lastGenerationParams, setLastGenerationParams] = useState<GenerationParams | null>(null);
 
+  // Auto-load history when triggerId changes
+  React.useEffect(() => {
+    if (triggerId && results.length === 0 && !historyLoading) {
+      fetchHistory({
+        trigger_name: triggerId,
+        limit: 50
+      });
+    }
+  }, [triggerId]); // Only depend on triggerId
+
   /**
    * Trigger batch generation
    */
@@ -96,7 +113,8 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
       promptTemplates,
       structuredData,
       temperature,
-      maxTokens
+      maxTokens,
+      variantStrategy = 'all_unique' // Default to all_unique if not specified
     } = params;
 
     try {
@@ -111,17 +129,40 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
       const newSessionId = `test-${Date.now()}`;
       setSessionId(newSessionId);
 
+      // Apply prompt mapping based on variant strategy
+      const promptMapping = getPromptMapping(variantStrategy, {
+        paid: promptTemplates.paid || '',
+        unpaid: promptTemplates.unpaid || '',
+        crawler: promptTemplates.crawler || ''
+      });
+
+      // Get unique prompts to avoid duplicate API calls
+      const uniquePrompts = getUniquePromptsForGeneration(variantStrategy, {
+        paid: promptTemplates.paid || '',
+        unpaid: promptTemplates.unpaid || '',
+        crawler: promptTemplates.crawler || ''
+      });
+
+      // Build mapped prompt templates (what prompts to actually use for each type)
+      const mappedPromptTemplates: Record<PromptType, string> = {
+        paid: promptMapping.paid,
+        unpaid: promptMapping.unpaid,
+        crawler: promptMapping.crawler
+      };
+
       // Build requests for all model × prompt type combinations
+      // Using mapped prompts based on variant strategy
       const requests = buildGenerationRequests({
         triggerId,
         stockId,
         modelIds,
         promptTypes,
-        promptTemplates,
+        promptTemplates: mappedPromptTemplates, // Use mapped prompts
         structuredData,
         temperature,
         maxTokens,
-        sessionId: newSessionId
+        sessionId: newSessionId,
+        variantStrategy // Pass variant strategy to service
       });
 
       // Initialize status
@@ -363,6 +404,106 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
   }, [resultVersions, selectedVersions]);
 
   /**
+   * Transform history items to GenerationResult format
+   */
+  const transformHistoryToResults = useCallback((historyItems: GenerationHistoryItem[]): GenerationResult[] => {
+    return historyItems.map(item => ({
+      prompt_type: item.prompt_type,
+      model_id: item.model_name, // Use model_name as model_id
+      response: {
+        generated_text: item.generated_text,
+        input_tokens: item.input_tokens,
+        output_tokens: item.output_tokens,
+        total_tokens: item.total_tokens,
+        cost: item.cost,
+        latency: item.latency,
+        model_name: item.model_name,
+        provider: item.provider,
+        timestamp: item.timestamp,
+        temperature: item.temperature,
+        max_tokens: item.max_tokens,
+        finish_reason: item.finish_reason
+      },
+      status: 'completed' as const,
+      requested_at: item.timestamp,
+      completed_at: item.timestamp
+    }));
+  }, []);
+
+  /**
+   * Rebuild version tracking from history items
+   */
+  const rebuildVersionTracking = useCallback((historyItems: GenerationHistoryItem[]) => {
+    if (historyItems.length === 0) return;
+
+    // Group history by (model_name, prompt_type) key
+    const groupedHistory = new Map<string, GenerationHistoryItem[]>();
+
+    historyItems.forEach(item => {
+      const key = `${item.model_name}-${item.prompt_type}`;
+      if (!groupedHistory.has(key)) {
+        groupedHistory.set(key, []);
+      }
+      groupedHistory.get(key)!.push(item);
+    });
+
+    // Build version tracking
+    const newVersions = new Map<string, GenerationVersion[]>();
+    const newSelectedVersions = new Map<string, number>();
+    const transformedResults: GenerationResult[] = [];
+
+    groupedHistory.forEach((items, key) => {
+      // Sort by timestamp (oldest first for version numbering)
+      const sortedItems = [...items].sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      // Create versions
+      const versions: GenerationVersion[] = sortedItems.map((item, index) => {
+        const result: GenerationResult = {
+          prompt_type: item.prompt_type,
+          model_id: item.model_name,
+          response: {
+            generated_text: item.generated_text,
+            input_tokens: item.input_tokens,
+            output_tokens: item.output_tokens,
+            total_tokens: item.total_tokens,
+            cost: item.cost,
+            latency: item.latency,
+            model_name: item.model_name,
+            provider: item.provider,
+            timestamp: item.timestamp,
+            temperature: item.temperature,
+            max_tokens: item.max_tokens,
+            finish_reason: item.finish_reason
+          },
+          status: 'completed',
+          requested_at: item.timestamp,
+          completed_at: item.timestamp
+        };
+
+        return {
+          version: index + 1,
+          result,
+          timestamp: item.timestamp,
+          prompt_used: '', // We don't store prompts in history yet
+          is_selected: index === sortedItems.length - 1 // Select latest version
+        };
+      });
+
+      newVersions.set(key, versions);
+      newSelectedVersions.set(key, versions.length - 1); // Select latest (last index)
+
+      // Add latest version to results
+      transformedResults.push(versions[versions.length - 1].result);
+    });
+
+    setResultVersions(newVersions);
+    setSelectedVersions(newSelectedVersions);
+    setResults(transformedResults);
+  }, []);
+
+  /**
    * Fetch generation history
    */
   const fetchHistory = useCallback(async (filters?: GenerationHistoryFilters) => {
@@ -372,6 +513,11 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
 
       const response = await fetchHistoryAPI(filters);
       setHistory(response.items);
+
+      // Rebuild version tracking from history
+      if (results.length === 0) {
+        rebuildVersionTracking(response.items);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load history';
       setHistoryError(errorMessage);
@@ -379,7 +525,7 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [results.length, rebuildVersionTracking]);
 
   const value: GenerationContextValue = {
     results,
@@ -387,11 +533,13 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
     status,
     error,
     sessionId,
+    triggerId,
     history,
     historyLoading,
     historyError,
     resultVersions,
     selectedVersions,
+    setTriggerId,
     triggerGeneration,
     clearResults,
     getResultsByType,

@@ -13,6 +13,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { GenerationResult, VariantStrategy, getStrategyRequirements } from '@/types/generation';
 import { Container, Row, Col, Card, Form, Button, Alert, Badge, Spinner, Dropdown } from 'react-bootstrap';
 import SectionManagementPanel, { Section, DEFAULT_SECTIONS } from '@/components/SectionManagementPanel';
 import OldDataDisplay from '@/components/OldDataDisplay';
@@ -24,11 +25,12 @@ import { ValidationProvider } from '@/contexts/ValidationContext';
 import { PreviewProvider } from '@/contexts/PreviewContext';
 import { DataProvider } from '@/contexts/DataContext';
 import { ModelProvider } from '@/contexts/ModelContext';
-import { GenerationProvider } from '@/contexts/GenerationContext';
+import { GenerationProvider, useGeneration } from '@/contexts/GenerationContext';
 import { SectionData } from '@/types/validation';
 import ModelSelection from '@/components/config/ModelSelection';
 import TestGenerationPanel from '@/components/config/TestGenerationPanel';
 import GenerationHistoryPanel from '@/components/config/GenerationHistoryPanel';
+import ComparisonView from '@/components/config/ComparisonView';
 
 interface PageProps {
   params: { triggerId: string };
@@ -38,6 +40,40 @@ type DataMode = 'OLD' | 'NEW' | 'OLD_NEW';
 type PromptType = 'paid' | 'unpaid' | 'webCrawler';
 
 type NavigationStep = 'data' | 'sections' | 'prompts' | 'testing' | 'results';
+
+/**
+ * TriggerIdSetter - Sets triggerId in GenerationContext on mount
+ * This triggers auto-load of last generated data
+ */
+const TriggerIdSetter: React.FC<{ triggerId: string }> = ({ triggerId }) => {
+  const { setTriggerId } = useGeneration();
+
+  useEffect(() => {
+    setTriggerId(triggerId);
+  }, [triggerId, setTriggerId]);
+
+  return null;
+};
+
+/**
+ * ResultsStepWrapper - Wraps ComparisonView with GenerationContext
+ * Simply passes results from context (auto-loaded by GenerationProvider)
+ */
+const ResultsStepWrapper: React.FC<{ triggerName: string; onNavigateToTesting: () => void }> = ({
+  triggerName,
+  onNavigateToTesting
+}) => {
+  const { results, historyLoading } = useGeneration();
+
+  return (
+    <ComparisonView
+      results={results}
+      triggerName={triggerName}
+      onNavigateToTesting={onNavigateToTesting}
+      isLoading={historyLoading}
+    />
+  );
+};
 
 export default function ConfigurationPage({ params }: PageProps) {
   const triggerId = params.triggerId;
@@ -66,7 +102,7 @@ export default function ConfigurationPage({ params }: PageProps) {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
 
   // Stock ID and data fetching
-  const [stockId, setStockId] = useState('TCS');
+  const [stockId, setStockId] = useState('');
   const [dataStatus, setDataStatus] = useState<'notConfigured' | 'fetching' | 'ready' | 'error'>('notConfigured');
 
   // Fetched trigger data state
@@ -556,7 +592,11 @@ export default function ConfigurationPage({ params }: PageProps) {
 
         {/* Main Content Area */}
         <PromptProvider>
-          <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
+          <GenerationProvider>
+            {/* Set triggerId to trigger auto-load */}
+            <TriggerIdSetter triggerId={triggerId} />
+
+            <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
             {/* Trigger Context Bar */}
           <div style={{
             background: '#ffffff',
@@ -1295,6 +1335,9 @@ export default function ConfigurationPage({ params }: PageProps) {
                 />
               </div>
 
+              {/* Variant Strategy Selector */}
+              <VariantStrategySelector />
+
               {/* Two-column layout: Data Display + Prompt Editor */}
               <Row>
                 {showDataPanel && (
@@ -1337,57 +1380,47 @@ export default function ConfigurationPage({ params }: PageProps) {
             >
               <TestingStepWrapper promptTypes={promptTypes}>
                 <ModelProvider triggerId={triggerId}>
-                  <GenerationProvider>
-                    {/* Toggle History Button */}
-                    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button
-                        variant={showHistoryPanel ? 'primary' : 'outline-secondary'}
-                        size="sm"
-                        onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-                      >
-                        <i className={`bi bi-clock-history me-1`}></i>
-                        {showHistoryPanel ? 'Hide History' : 'View History'}
-                      </Button>
-                    </div>
+                  {/* Toggle History Button */}
+                  <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant={showHistoryPanel ? 'primary' : 'outline-secondary'}
+                      size="sm"
+                      onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                    >
+                      <i className={`bi bi-clock-history me-1`}></i>
+                      {showHistoryPanel ? 'Hide History' : 'View History'}
+                    </Button>
+                  </div>
 
-                    <ModelSelection />
-                    <TestGenerationPanel />
+                  <ModelSelection />
+                  <TestGenerationPanel />
 
-                    {/* History Panel */}
-                    {showHistoryPanel && (
-                      <GenerationHistoryPanel
-                        triggerId={triggerId}
-                        onLoadConfiguration={(item) => {
-                          // TODO: Implement loading configuration from history item
-                          // This would populate the model selection, temperature, max_tokens
-                          // from the history item
-                          console.log('Load configuration from history:', item);
-                          alert('Load configuration feature coming soon! Check console for history item.');
-                        }}
-                      />
-                    )}
-                  </GenerationProvider>
+                  {/* History Panel */}
+                  {showHistoryPanel && (
+                    <GenerationHistoryPanel
+                      triggerId={triggerId}
+                      onLoadConfiguration={(item) => {
+                        // TODO: Implement loading configuration from history item
+                        // This would populate the model selection, temperature, max_tokens
+                        // from the history item
+                        console.log('Load configuration from history:', item);
+                        alert('Load configuration feature coming soon! Check console for history item.');
+                      }}
+                    />
+                  )}
                 </ModelProvider>
               </TestingStepWrapper>
             </DataProvider>
           )}
 
           {activeStep === 'results' && (
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '8px',
-              padding: '24px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
-            }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#212529', marginBottom: '16px' }}>
-                {navigationItems.find(item => item.id === activeStep)?.label}
-              </h2>
-              <p style={{ fontSize: '16px', color: '#6c757d', fontStyle: 'italic' }}>
-                [Content panels will be placed here]
-              </p>
-            </div>
+            <ResultsStepWrapper
+              triggerName={triggerId}
+              onNavigateToTesting={() => setActiveStep('testing')}
+            />
           )}
           </div>
+          </GenerationProvider>
         </PromptProvider>
       </div>
 
@@ -1545,4 +1578,78 @@ function TestingStepWrapper({ promptTypes, children }: TestingStepWrapperProps) 
   }, [promptTypes, setCheckedTypes]);
 
   return <>{children}</>;
+}
+
+// Variant Strategy Selector Component
+function VariantStrategySelector() {
+  const { variantStrategy, setVariantStrategy, strategyValidation } = usePrompt();
+
+  const strategies: VariantStrategy[] = [
+    'all_same',
+    'all_unique',
+    'paid_unique',
+    'unpaid_unique',
+    'crawler_unique'
+  ];
+
+  return (
+    <div style={{ marginBottom: '24px' }}>
+      <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
+        Content Variation Strategy
+      </h5>
+      <Alert variant="secondary" style={{ marginBottom: '16px', fontSize: '14px' }}>
+        <i className="bi bi-info-circle me-2"></i>
+        <strong>Optimize API calls:</strong> Control how prompts are used across paid/unpaid/crawler news types.
+      </Alert>
+
+      <Form.Group>
+        {strategies.map((strategy) => {
+          const info = getStrategyRequirements(strategy);
+          return (
+            <div
+              key={strategy}
+              style={{
+                marginBottom: '12px',
+                padding: '12px',
+                border: '1px solid #dee2e6',
+                borderRadius: '6px',
+                backgroundColor: variantStrategy === strategy ? '#f8f9fa' : 'white',
+                cursor: 'pointer'
+              }}
+              onClick={() => setVariantStrategy(strategy)}
+            >
+              <Form.Check
+                type="radio"
+                id={`strategy-${strategy}`}
+                name="variant-strategy"
+                checked={variantStrategy === strategy}
+                onChange={() => setVariantStrategy(strategy)}
+                label={
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                      {strategy.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      <Badge bg="info" className="ms-2" style={{ fontSize: '11px' }}>
+                        {info.apiCalls} API call{info.apiCalls !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6c757d' }}>
+                      {info.description}
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          );
+        })}
+      </Form.Group>
+
+      {/* Validation Warning */}
+      {!strategyValidation.isValid && (
+        <Alert variant="warning" style={{ marginTop: '12px' }}>
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          <strong>Missing required prompts:</strong> {strategyValidation.errorMessage}
+        </Alert>
+      )}
+    </div>
+  );
 }

@@ -2,7 +2,7 @@
 FastAPI router for trigger management endpoints
 """
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from ..database import get_database
 from ..models.trigger_prompt_config import TriggerPromptConfig
@@ -500,8 +500,9 @@ async def save_prompt_drafts(trigger_name: str, prompts_data: dict):
         if not trigger_doc:
             raise HTTPException(status_code=404, detail=f"Trigger '{trigger_name}' not found")
 
-        # Extract prompts from request
+        # Extract prompts and variant_strategy from request
         prompts_input = prompts_data.get("prompts", {})
+        variant_strategy = prompts_data.get("variant_strategy", "all_same")
 
         # Validate that prompt types are valid
         valid_types = {"paid", "unpaid", "crawler"}
@@ -514,21 +515,98 @@ async def save_prompt_drafts(trigger_name: str, prompts_data: dict):
 
         # Build prompts object for the draft
         now = datetime.utcnow()
-        prompts_obj = {}
 
+        # First, collect all non-empty prompts
+        filled_prompts = {}
         for prompt_type in valid_types:
             if prompt_type in prompts_input:
                 template = prompts_input[prompt_type].get("template", "")
+                if template.strip():
+                    filled_prompts[prompt_type] = template
 
-                if template.strip():  # Only include non-empty prompts
+        if not filled_prompts:
+            raise HTTPException(status_code=400, detail="No valid prompts provided")
+
+        # Apply variant strategy mapping to determine which prompts to save
+        prompts_obj = {}
+
+        if variant_strategy == "all_same":
+            # All types use the paid prompt - save all 3 with same content
+            if "paid" in filled_prompts:
+                template = filled_prompts["paid"]
+                for prompt_type in valid_types:
                     prompts_obj[prompt_type] = {
                         "template": template,
                         "character_count": len(template),
-                        "word_count": len(template.split()) if template else 0
+                        "word_count": len(template.split())
+                    }
+        elif variant_strategy == "all_unique":
+            # Each type uses its own prompt - save only what's filled
+            for prompt_type in valid_types:
+                if prompt_type in filled_prompts:
+                    template = filled_prompts[prompt_type]
+                    prompts_obj[prompt_type] = {
+                        "template": template,
+                        "character_count": len(template),
+                        "word_count": len(template.split())
+                    }
+        elif variant_strategy == "paid_unique":
+            # Paid is unique, unpaid/crawler share
+            if "paid" in filled_prompts:
+                template = filled_prompts["paid"]
+                prompts_obj["paid"] = {
+                    "template": template,
+                    "character_count": len(template),
+                    "word_count": len(template.split())
+                }
+            # Unpaid and crawler share (whichever is filled)
+            shared_template = filled_prompts.get("unpaid") or filled_prompts.get("crawler")
+            if shared_template:
+                for prompt_type in ["unpaid", "crawler"]:
+                    prompts_obj[prompt_type] = {
+                        "template": shared_template,
+                        "character_count": len(shared_template),
+                        "word_count": len(shared_template.split())
+                    }
+        elif variant_strategy == "unpaid_unique":
+            # Unpaid is unique, paid/crawler share
+            if "unpaid" in filled_prompts:
+                template = filled_prompts["unpaid"]
+                prompts_obj["unpaid"] = {
+                    "template": template,
+                    "character_count": len(template),
+                    "word_count": len(template.split())
+                }
+            # Paid and crawler share (whichever is filled)
+            shared_template = filled_prompts.get("paid") or filled_prompts.get("crawler")
+            if shared_template:
+                for prompt_type in ["paid", "crawler"]:
+                    prompts_obj[prompt_type] = {
+                        "template": shared_template,
+                        "character_count": len(shared_template),
+                        "word_count": len(shared_template.split())
+                    }
+        elif variant_strategy == "crawler_unique":
+            # Crawler is unique, paid/unpaid share
+            if "crawler" in filled_prompts:
+                template = filled_prompts["crawler"]
+                prompts_obj["crawler"] = {
+                    "template": template,
+                    "character_count": len(template),
+                    "word_count": len(template.split())
+                }
+            # Paid and unpaid share (whichever is filled)
+            shared_template = filled_prompts.get("paid") or filled_prompts.get("unpaid")
+            if shared_template:
+                for prompt_type in ["paid", "unpaid"]:
+                    prompts_obj[prompt_type] = {
+                        "template": shared_template,
+                        "character_count": len(shared_template),
+                        "word_count": len(shared_template.split())
                     }
 
         if not prompts_obj:
-            raise HTTPException(status_code=400, detail="No valid prompts provided")
+            raise HTTPException(status_code=400, detail="No valid prompts after applying variant strategy")
 
         # Get latest version number for this trigger
         latest_draft = await db.trigger_prompt_drafts.find_one(
@@ -541,6 +619,7 @@ async def save_prompt_drafts(trigger_name: str, prompts_data: dict):
         draft = TriggerPromptDraft(
             trigger_name=trigger_name,
             prompts=prompts_obj,
+            variant_strategy=variant_strategy,  # Include variant strategy
             saved_by="system",  # TODO: Get from auth context
             saved_at=now,
             is_draft=True,
@@ -1117,6 +1196,8 @@ async def get_latest_draft(trigger_name: str):
     Used by frontend to load existing draft when page mounts.
     """
     try:
+        db = get_database()
+
         # Find latest draft for this trigger
         latest_draft = await db.trigger_prompt_drafts.find_one(
             {"trigger_name": trigger_name},
@@ -1152,3 +1233,440 @@ async def get_latest_draft(trigger_name: str):
     except Exception as e:
         logger.error(f"Failed to retrieve latest draft for trigger '{trigger_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve draft: {str(e)}")
+
+
+@router.post("/{trigger_name}/validate")
+async def validate_configuration(trigger_name: str, validation_data: dict):
+    """
+    Validate trigger configuration before publishing (Story 5.1)
+
+    Validates:
+    - Prompt templates not empty for enabled types
+    - At least one API configured
+    - Section order defined
+    - Model selected
+    - Successful test generation exists for each prompt type
+    - Generation results are acceptable (not empty, reasonable cost)
+
+    Request body:
+    {
+        "apis": ["earnings_api", "price_data_api"],
+        "section_order": ["company_overview", "financial_data"],
+        "prompts": {
+            "paid": "Generate article...",
+            "unpaid": "Generate article...",
+            "crawler": "Generate article..."
+        },
+        "model_settings": {
+            "selected_models": ["gpt-4o", "claude-3.5-sonnet"],
+            "temperature": 0.7,
+            "max_tokens": 500
+        },
+        "enabled_prompt_types": ["paid", "unpaid", "crawler"],
+        "session_id": "test-1234567890"  # Optional
+    }
+
+    Returns validation result with issues grouped by prompt type
+    """
+    try:
+        from ..services.validation_service import get_validation_service
+
+        # Extract validation data
+        apis = validation_data.get("apis", [])
+        section_order = validation_data.get("section_order", [])
+        prompts = validation_data.get("prompts", {})
+        model_settings = validation_data.get("model_settings", {})
+        enabled_prompt_types = validation_data.get("enabled_prompt_types", ["paid", "unpaid", "crawler"])
+        session_id = validation_data.get("session_id")
+
+        # Get validation service
+        validation_service = get_validation_service(db)
+
+        # Run validation
+        validation_result = await validation_service.validate_configuration(
+            trigger_id=trigger_name,
+            apis=apis,
+            section_order=section_order,
+            prompts=prompts,
+            model_settings=model_settings,
+            enabled_prompt_types=enabled_prompt_types,
+            session_id=session_id
+        )
+
+        # Convert to dict for response
+        return {
+            "success": True,
+            "is_valid": validation_result.is_valid,
+            "prompt_types": {
+                pt: {
+                    "prompt_type": result.prompt_type,
+                    "is_valid": result.is_valid,
+                    "issues": [issue.dict() for issue in result.issues],
+                    "test_metadata": result.test_metadata
+                }
+                for pt, result in validation_result.prompt_types.items()
+            },
+            "shared_config_issues": [issue.dict() for issue in validation_result.shared_config_issues],
+            "summary": validation_result.summary
+        }
+
+    except Exception as e:
+        logger.error(f"Validation failed for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+@router.post("/{trigger_name}/publish")
+async def publish_configuration(trigger_name: str, publish_data: dict):
+    """
+    Publish trigger configuration to production (Story 5.2)
+
+    Request body:
+    {
+        "apis": ["earnings_api", "price_data_api"],
+        "section_order": ["company_overview", "financial_data"],
+        "prompts": {
+            "paid": "Generate article...",
+            "unpaid": "Generate article...",
+            "crawler": "Generate article..."
+        },
+        "model_settings": {
+            "selected_models": ["gpt-4o", "claude-3.5-sonnet"],
+            "temperature": 0.7,
+            "max_tokens": 500
+        },
+        "test_results_summary": {
+            "paid": {
+                "models_tested": ["gpt-4o", "claude-3.5-sonnet"],
+                "avg_cost": 0.42,
+                "avg_latency": 8.5,
+                "total_tests": 2,
+                "sample_output_preview": "Apple Inc. reported..."
+            }
+        },
+        "published_by": "user123",
+        "notes": "Optional publishing notes"
+    }
+
+    Returns:
+    {
+        "success": true,
+        "message": "Configuration published successfully as version 5",
+        "trigger_id": "earnings",
+        "version": 5,
+        "published_at": "2025-11-06T14:30:00Z",
+        "is_active": true
+    }
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+        from ..models.published_config import PublishRequest, TestResultsSummary
+
+        # Parse test_results_summary
+        test_results_summary = {}
+        raw_test_results = publish_data.get("test_results_summary", {})
+        for prompt_type, summary_data in raw_test_results.items():
+            test_results_summary[prompt_type] = TestResultsSummary(**summary_data)
+
+        # Create publish request
+        publish_request = PublishRequest(
+            apis=publish_data.get("apis", []),
+            section_order=publish_data.get("section_order", []),
+            prompts=publish_data.get("prompts", {}),
+            model_settings=publish_data.get("model_settings", {}),
+            test_results_summary=test_results_summary,
+            published_by=publish_data.get("published_by", "unknown"),
+            notes=publish_data.get("notes")
+        )
+
+        # Get publishing service
+        publishing_service = get_publishing_service(db)
+
+        # Publish configuration
+        response = await publishing_service.publish_configuration(
+            trigger_id=trigger_name,
+            publish_request=publish_request
+        )
+
+        return response.model_dump()
+
+    except Exception as e:
+        logger.error(f"Publishing failed for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Publishing failed: {str(e)}")
+
+
+@router.get("/{trigger_name}/published")
+async def get_active_published_config(trigger_name: str):
+    """
+    Get the active published configuration for a trigger (Story 5.2)
+
+    Returns the currently active published configuration with version info
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+
+        publishing_service = get_publishing_service(db)
+        config = await publishing_service.get_active_configuration(trigger_name)
+
+        if not config:
+            raise HTTPException(status_code=404, detail="No published configuration found")
+
+        return config.model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get published config for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve published config: {str(e)}")
+
+
+@router.get("/{trigger_name}/audit-logs")
+async def get_audit_logs(
+    trigger_name: str,
+    action: Optional[str] = None,
+    performed_by: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0
+):
+    """
+    Get audit logs for a trigger (Story 5.3)
+
+    Query parameters:
+    - action: Filter by action type (publish, rollback, etc.)
+    - performed_by: Filter by user ID
+    - limit: Maximum number of results (default 50, max 500)
+    - skip: Number of results to skip for pagination
+    """
+    try:
+        from ..services.audit_service import get_audit_service
+        from ..models.audit_log import AuditLogFilter
+
+        # Create filter
+        filter_params = AuditLogFilter(
+            trigger_id=trigger_name,
+            action=action,
+            performed_by=performed_by,
+            limit=min(limit, 500),
+            skip=skip
+        )
+
+        # Get audit service and query logs
+        audit_service = get_audit_service(db)
+        logs = await audit_service.get_audit_logs(filter_params)
+
+        return {
+            "success": True,
+            "logs": [log.model_dump() for log in logs],
+            "count": len(logs),
+            "skip": skip,
+            "limit": limit
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get audit logs for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve audit logs: {str(e)}")
+
+
+@router.get("/{trigger_name}/audit-stats")
+async def get_audit_stats(trigger_name: str):
+    """
+    Get audit statistics for a trigger (Story 5.3)
+
+    Returns statistics like total publishes, rollbacks, success rate, etc.
+    """
+    try:
+        from ..services.audit_service import get_audit_service
+
+        audit_service = get_audit_service(db)
+        stats = await audit_service.get_stats(trigger_name)
+
+        return {
+            "success": True,
+            "stats": stats.model_dump()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get audit stats for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve audit stats: {str(e)}")
+
+
+@router.get("/{trigger_name}/versions")
+async def get_all_versions(trigger_name: str, limit: int = 50):
+    """
+    Get all published versions for a trigger (Story 5.4)
+
+    Query parameters:
+    - limit: Maximum number of versions to return (default 50)
+
+    Returns list of all published configurations, newest first
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+
+        publishing_service = get_publishing_service(db)
+        versions = await publishing_service.get_all_versions(trigger_name, limit=limit)
+
+        return {
+            "success": True,
+            "versions": [version.model_dump() for version in versions],
+            "count": len(versions)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get versions for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve versions: {str(e)}")
+
+
+@router.get("/{trigger_name}/versions/{version}")
+async def get_version_by_number(trigger_name: str, version: int):
+    """
+    Get a specific version of published configuration (Story 5.4)
+
+    Returns the complete configuration snapshot for the specified version
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+
+        publishing_service = get_publishing_service(db)
+        config = await publishing_service.get_configuration_by_version(trigger_name, version)
+
+        if not config:
+            raise HTTPException(status_code=404, detail=f"Version {version} not found")
+
+        return {
+            "success": True,
+            "version": config.model_dump()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get version {version} for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve version: {str(e)}")
+
+
+@router.post("/{trigger_name}/versions/{version}/compare")
+async def compare_versions(trigger_name: str, version: int, compare_data: dict):
+    """
+    Compare two versions of configuration (Story 5.4)
+
+    Request body:
+    {
+        "compare_with_version": 4
+    }
+
+    Returns a detailed diff between the two versions
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+
+        compare_with_version = compare_data.get("compare_with_version")
+        if not compare_with_version:
+            raise HTTPException(status_code=400, detail="compare_with_version is required")
+
+        publishing_service = get_publishing_service(db)
+
+        # Get both versions
+        version_a = await publishing_service.get_configuration_by_version(trigger_name, version)
+        version_b = await publishing_service.get_configuration_by_version(trigger_name, compare_with_version)
+
+        if not version_a:
+            raise HTTPException(status_code=404, detail=f"Version {version} not found")
+        if not version_b:
+            raise HTTPException(status_code=404, detail=f"Version {compare_with_version} not found")
+
+        # Compare configurations
+        diff = {
+            "version_a": version,
+            "version_b": compare_with_version,
+            "differences": {}
+        }
+
+        # Compare APIs
+        if set(version_a.apis) != set(version_b.apis):
+            diff["differences"]["apis"] = {
+                "version_a": version_a.apis,
+                "version_b": version_b.apis,
+                "added": list(set(version_b.apis) - set(version_a.apis)),
+                "removed": list(set(version_a.apis) - set(version_b.apis))
+            }
+
+        # Compare section order
+        if version_a.section_order != version_b.section_order:
+            diff["differences"]["section_order"] = {
+                "version_a": version_a.section_order,
+                "version_b": version_b.section_order
+            }
+
+        # Compare prompts
+        prompt_diffs = {}
+        all_prompt_types = set(version_a.prompts.keys()) | set(version_b.prompts.keys())
+        for prompt_type in all_prompt_types:
+            prompt_a = version_a.prompts.get(prompt_type, "")
+            prompt_b = version_b.prompts.get(prompt_type, "")
+            if prompt_a != prompt_b:
+                prompt_diffs[prompt_type] = {
+                    "version_a": prompt_a,
+                    "version_b": prompt_b,
+                    "changed": prompt_a != prompt_b
+                }
+        if prompt_diffs:
+            diff["differences"]["prompts"] = prompt_diffs
+
+        # Compare model settings
+        if version_a.model_settings != version_b.model_settings:
+            diff["differences"]["model_settings"] = {
+                "version_a": version_a.model_settings,
+                "version_b": version_b.model_settings
+            }
+
+        # Compare test results summary
+        if version_a.test_results_summary != version_b.test_results_summary:
+            diff["differences"]["test_results_summary"] = {
+                "version_a": {k: v.model_dump() for k, v in version_a.test_results_summary.items()},
+                "version_b": {k: v.model_dump() for k, v in version_b.test_results_summary.items()}
+            }
+
+        return {
+            "success": True,
+            "diff": diff,
+            "has_differences": len(diff["differences"]) > 0
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to compare versions for trigger '{trigger_name}': {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to compare versions: {str(e)}")
+
+
+@router.post("/{trigger_name}/versions/{version}/rollback")
+async def rollback_to_version(trigger_name: str, version: int, rollback_data: dict):
+    """
+    Rollback to a previous version (Story 5.4)
+
+    Request body:
+    {
+        "performed_by": "user123"
+    }
+
+    Creates a new version that's a copy of the target version
+    """
+    try:
+        from ..services.publishing_service import get_publishing_service
+
+        performed_by = rollback_data.get("performed_by", "unknown")
+
+        publishing_service = get_publishing_service(db)
+        response = await publishing_service.rollback_to_version(
+            trigger_id=trigger_name,
+            target_version=version,
+            published_by=performed_by
+        )
+
+        return response.model_dump()
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to rollback trigger '{trigger_name}' to version {version}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to rollback: {str(e)}")
