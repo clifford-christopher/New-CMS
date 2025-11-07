@@ -24,6 +24,7 @@ The News CMS will transform this process by providing a visual, interactive inte
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
+| 2025-11-07 | 2.0 | Completed all 5 core epics. Added Variant Strategy Feature (Story 5.6) for optimized API calls. All 30 core stories complete. | Claude |
 | 2025-11-06 | 1.5 | Completed Epic 4 (Stories 4.2-4.6): Multi-Model Generation & Testing with iterative refinement workflow. 20/29 stories complete | Claude |
 | 2025-11-06 | 1.4 | Completed Story 1.5a (Third-Party API Setup) and Story 4.1 (LLM Abstraction Layer). 15/29 stories complete | Claude |
 | 2025-11-06 | 1.3 | Added FR41-FR43: Placeholder validation and template handling features | Claude |
@@ -78,6 +79,11 @@ The News CMS will transform this process by providing a visual, interactive inte
 - **FR41**: The system shall display warning messages when prompt templates contain no placeholders to prevent generation of unrelated content
 - **FR42**: The system shall validate placeholders with support for string section IDs (like 'old_data'), case-insensitive section names, and multiple placeholder formats
 - **FR43**: The system shall perform case-insensitive placeholder substitution in backend to handle placeholder variations (e.g., {{OLD Data}} matching section key "old_data")
+- **FR44**: The system shall provide variant strategy selection to optimize API calls by controlling how prompts are used across news types (paid, unpaid, crawler)
+- **FR45**: The system shall automatically show/hide prompt editor tabs based on selected variant strategy (e.g., "all_same" shows only paid tab)
+- **FR46**: The system shall validate that required prompts are filled before allowing generation based on selected variant strategy
+- **FR47**: The system shall replicate prompts according to variant strategy when saving configurations (e.g., "all_same" saves all 3 types with same content)
+- **FR48**: The system shall display API call count estimation based on variant strategy selection to help users understand cost implications
 
 ### Non Functional
 
@@ -971,11 +977,15 @@ Enable publishing of tested configurations to production with validation, audit 
 11. Metadata tooltip provides breakdown: "Prompt tokens: 234, Completion tokens: 222, Total: 456"
 12. Performance indicators: green (fast/<5s), yellow (medium 5-15s), red (slow/>15s) for time taken
 
-## Epic 5: Configuration Publishing & Production Integration
+## Epic 5: Configuration Publishing & Production Integration ✅ COMPLETED (2025-11-07)
 
 **Goal**: Enable content managers to confidently publish tested configurations to production with validation safeguards, versioning, comprehensive audit trails, and integration with the existing news generation system. This epic closes the loop from testing to production deployment, delivering the key business value of eliminating developer dependency.
 
-### Story 5.1: Pre-Publish Validation (All Prompt Types)
+**Stories**: ✅ All stories 5.1-5.6 COMPLETED (2025-11-07)
+
+**Status**: EPIC COMPLETE - Full publishing workflow with validation, audit logging, version history, production integration, and variant strategy optimization for API call efficiency.
+
+### Story 5.1: Pre-Publish Validation (All Prompt Types) ✅ COMPLETED (2025-11-07)
 
 **As a** content manager,
 **I want** the system to validate all prompt type configurations before publishing,
@@ -1000,7 +1010,7 @@ Enable publishing of tested configurations to production with validation, audit 
 9. Optional: Suggest minimum testing threshold (e.g., "Test all prompt types with at least 2 models before publishing")
 10. Validation errors include actionable guidance per prompt type (e.g., "Paid prompt is empty - add prompt content to continue")
 
-### Story 5.2: Configuration Publishing with Confirmation (All Prompt Types)
+### Story 5.2: Configuration Publishing with Confirmation (All Prompt Types) ✅ COMPLETED (2025-11-07)
 
 **As a** content manager,
 **I want** to review and confirm exactly what will be published for all prompt types,
@@ -1027,7 +1037,7 @@ Enable publishing of tested configurations to production with validation, audit 
 10. Published configuration immediately available for use by automated news generation system for all prompt types
 11. "View Published Configuration" link navigates to read-only view of active production config showing all three prompt types
 
-### Story 5.3: Audit Logging and Change Tracking
+### Story 5.3: Audit Logging and Change Tracking ✅ COMPLETED (2025-11-07)
 
 **As a** compliance officer or system administrator,
 **I want** comprehensive audit logs of all configuration changes,
@@ -1045,7 +1055,7 @@ Enable publishing of tested configurations to production with validation, audit 
 9. Audit logs immutable (no deletion or editing allowed via UI)
 10. Meets NFR15: comprehensive audit logs for compliance
 
-### Story 5.4: Configuration Version History and Rollback
+### Story 5.4: Configuration Version History and Rollback ✅ COMPLETED (2025-11-07)
 
 **As a** content manager,
 **I want** to view previous configuration versions and rollback if needed,
@@ -1063,7 +1073,7 @@ Enable publishing of tested configurations to production with validation, audit 
 9. Meets requirement for configuration versioning and history maintenance
 10. Version metadata includes: which model was used for testing, cost of test generations, number of test iterations
 
-### Story 5.5: Production Integration and Active Configuration API
+### Story 5.5: Production Integration and Active Configuration API ✅ COMPLETED (2025-11-07)
 
 **As a** backend developer (of existing news generation system),
 **I want** a stable API to fetch active configurations for triggers,
@@ -1080,6 +1090,62 @@ Enable publishing of tested configurations to production with validation, audit 
 8. Integration test validates that published configuration is immediately accessible via this endpoint
 9. Backward compatibility maintained with existing news generation system expectations
 10. Logging of all API calls for monitoring integration health
+
+### Story 5.6: Variant Strategy for API Call Optimization ✅ COMPLETED (2025-11-07)
+
+**As a** content manager,
+**I want** to select a variant strategy that controls how prompts are used across news types,
+**so that** I can optimize API costs by reducing duplicate generations while maintaining content quality.
+
+**Acceptance Criteria**:
+1. ✅ Variant strategy selector displayed in Prompt Engineering step with 5 strategy options
+2. ✅ Strategy options with descriptions and API call counts:
+   - **all_same** (1 API call): Use one prompt for all types - most cost-effective
+   - **all_unique** (3 API calls): Generate unique content for each type
+   - **paid_unique** (2 API calls): Unique paid content, shared unpaid/crawler
+   - **unpaid_unique** (2 API calls): Unique unpaid content, shared paid/crawler
+   - **crawler_unique** (2 API calls): Unique crawler content, shared paid/unpaid
+3. ✅ Dynamic UI: Prompt editor tabs automatically show/hide based on selected strategy
+   - "all_same" shows only paid tab (unpaid/crawler hidden)
+   - Other strategies show all 3 tabs
+4. ✅ Strategy validation: Required prompts must be filled before generation
+   - "all_same" requires paid prompt filled
+   - "all_unique" requires all 3 prompts filled
+   - "xxx_unique" requires unique prompt + at least one other prompt
+5. ✅ Validation warnings displayed when strategy requirements not met
+6. ✅ Generation disabled when validation fails with clear error messages
+7. ✅ Backend applies strategy mapping when saving prompts to database
+   - "all_same" saves all 3 types with paid content (no empty prompts)
+   - "paid_unique" saves paid unique + shared content for unpaid/crawler
+   - Similar logic for other strategies
+8. ✅ Frontend generation applies strategy mapping before API calls
+9. ✅ Strategy stored in configuration and persists across sessions
+10. ✅ Strategy default value: "all_same" for new configurations
+
+**Implementation Details**:
+- **Frontend Files**:
+  - `frontend/src/types/generation.ts`: VariantStrategy type, helper functions (getVisibleTabs, getPromptMapping, validateStrategy, getUniquePromptsForGeneration)
+  - `frontend/src/contexts/PromptContext.tsx`: Strategy state management, auto-update checkedTypes
+  - `frontend/src/components/config/TestGenerationPanel.tsx`: Strategy validation UI
+  - `frontend/src/contexts/GenerationContext.tsx`: Apply prompt mapping during generation
+  - `frontend/src/app/config/[triggerId]/page.tsx`: VariantStrategySelector component
+
+- **Backend Files**:
+  - `backend/app/models/trigger_prompt_draft.py`: VariantStrategy enum
+  - `backend/app/routers/triggers.py`: Strategy-based prompt replication logic
+
+- **Key Features**:
+  - Reduces API calls from 3 to 1-2 depending on strategy
+  - Smart prompt mapping prevents duplicate generations
+  - Validation ensures content quality maintained
+  - Database stores complete prompts (no empty strings)
+  - UI dynamically adapts to selected strategy
+
+- **User Impact**:
+  - Cost savings: Can reduce API costs by 33-67% using optimized strategies
+  - Flexibility: Choose appropriate strategy based on content needs
+  - Simplicity: "all_same" strategy simplifies workflow when content doesn't need variation
+  - Quality control: Validation prevents incomplete configurations
 
 ## Checklist Results Report
 
