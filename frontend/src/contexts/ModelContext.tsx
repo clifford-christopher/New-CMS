@@ -27,7 +27,7 @@ interface ModelContextValue {
   modelsLoading: boolean;
   modelsError: string | null;
 
-  // Current configuration
+  // Current configuration (multiple models for testing)
   selectedModels: string[];
   temperature: number;
   maxTokens: number;
@@ -55,7 +55,7 @@ interface ModelContextValue {
 
 const ModelContext = createContext<ModelContextValue | undefined>(undefined);
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
 /**
  * Default cost estimation parameters
@@ -77,7 +77,7 @@ export const ModelProvider: React.FC<ModelProviderProps> = ({ children, triggerI
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
-  // Current configuration
+  // Current configuration (multiple models for testing)
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(500);
@@ -123,8 +123,14 @@ export const ModelProvider: React.FC<ModelProviderProps> = ({ children, triggerI
         `${API_BASE_URL}/api/triggers/${triggerId}/config/models`
       );
 
-      const config = response.data.model_config;
-      setSelectedModels(config.selected_models);
+      const config = response.data.llm_config;
+      // Handle both formats: selected_models array (preferred) or model string (legacy)
+      if (config.selected_models && Array.isArray(config.selected_models)) {
+        setSelectedModels(config.selected_models);
+      } else if (config.model) {
+        // Legacy single model format - convert to array
+        setSelectedModels([config.model]);
+      }
       setTemperature(config.temperature);
       setMaxTokens(config.max_tokens);
       setIsConfigured(response.data.is_configured);
@@ -159,7 +165,7 @@ export const ModelProvider: React.FC<ModelProviderProps> = ({ children, triggerI
       await axios.post(
         `${API_BASE_URL}/api/triggers/${triggerId}/config/models`,
         {
-          selected_models: selectedModels,
+          selected_models: selectedModels, // Send array for testing
           temperature,
           max_tokens: maxTokens
         }
@@ -178,7 +184,7 @@ export const ModelProvider: React.FC<ModelProviderProps> = ({ children, triggerI
   }, [triggerId, selectedModels, temperature, maxTokens]);
 
   /**
-   * Toggle model selection
+   * Toggle model selection (for multi-select during testing)
    */
   const toggleModel = useCallback((modelId: string) => {
     setSelectedModels(prev => {

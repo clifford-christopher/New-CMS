@@ -73,6 +73,115 @@ router = APIRouter(prefix="/api/triggers", tags=["triggers"])
 logger = logging.getLogger(__name__)
 
 
+def apply_variant_strategy_mapping(prompts_data: dict, variant_strategy: str = "all_same") -> dict:
+    """
+    Apply variant strategy mapping to prompts.
+
+    Takes raw prompt data and applies replication rules based on the variant strategy:
+    - all_same: Use paid prompt for all types (1 API call)
+    - all_unique: Use separate prompts for each type (3 API calls)
+    - paid_unique: Unique paid, shared unpaid/crawler (2 API calls)
+    - unpaid_unique: Unique unpaid, shared paid/crawler (2 API calls)
+    - crawler_unique: Unique crawler, shared paid/unpaid (2 API calls)
+
+    Args:
+        prompts_data: Dictionary with prompt types as keys, each containing "template" field
+        variant_strategy: Strategy to apply
+
+    Returns:
+        Dictionary with prompts replicated according to strategy, each with template/character_count/word_count
+    """
+    valid_types = ["paid", "unpaid", "crawler"]
+
+    # Extract filled prompts (prompts with non-empty templates)
+    filled_prompts = {}
+    for prompt_type in valid_types:
+        if prompt_type in prompts_data:
+            template = prompts_data[prompt_type].get("template", "").strip()
+            if template:
+                filled_prompts[prompt_type] = template
+
+    # Apply variant strategy mapping
+    prompts_obj = {}
+
+    if variant_strategy == "all_same":
+        # All types use the paid prompt - save all 3 with same content
+        if "paid" in filled_prompts:
+            template = filled_prompts["paid"]
+            for prompt_type in valid_types:
+                prompts_obj[prompt_type] = {
+                    "template": template,
+                    "character_count": len(template),
+                    "word_count": len(template.split())
+                }
+    elif variant_strategy == "all_unique":
+        # Each type uses its own prompt - save only what's filled
+        for prompt_type in valid_types:
+            if prompt_type in filled_prompts:
+                template = filled_prompts[prompt_type]
+                prompts_obj[prompt_type] = {
+                    "template": template,
+                    "character_count": len(template),
+                    "word_count": len(template.split())
+                }
+    elif variant_strategy == "paid_unique":
+        # Paid is unique, unpaid/crawler share
+        if "paid" in filled_prompts:
+            template = filled_prompts["paid"]
+            prompts_obj["paid"] = {
+                "template": template,
+                "character_count": len(template),
+                "word_count": len(template.split())
+            }
+        # Unpaid and crawler share (whichever is filled)
+        shared_template = filled_prompts.get("unpaid") or filled_prompts.get("crawler")
+        if shared_template:
+            for prompt_type in ["unpaid", "crawler"]:
+                prompts_obj[prompt_type] = {
+                    "template": shared_template,
+                    "character_count": len(shared_template),
+                    "word_count": len(shared_template.split())
+                }
+    elif variant_strategy == "unpaid_unique":
+        # Unpaid is unique, paid/crawler share
+        if "unpaid" in filled_prompts:
+            template = filled_prompts["unpaid"]
+            prompts_obj["unpaid"] = {
+                "template": template,
+                "character_count": len(template),
+                "word_count": len(template.split())
+            }
+        # Paid and crawler share (whichever is filled)
+        shared_template = filled_prompts.get("paid") or filled_prompts.get("crawler")
+        if shared_template:
+            for prompt_type in ["paid", "crawler"]:
+                prompts_obj[prompt_type] = {
+                    "template": shared_template,
+                    "character_count": len(shared_template),
+                    "word_count": len(shared_template.split())
+                }
+    elif variant_strategy == "crawler_unique":
+        # Crawler is unique, paid/unpaid share
+        if "crawler" in filled_prompts:
+            template = filled_prompts["crawler"]
+            prompts_obj["crawler"] = {
+                "template": template,
+                "character_count": len(template),
+                "word_count": len(template.split())
+            }
+        # Paid and unpaid share (whichever is filled)
+        shared_template = filled_prompts.get("paid") or filled_prompts.get("unpaid")
+        if shared_template:
+            for prompt_type in ["paid", "unpaid"]:
+                prompts_obj[prompt_type] = {
+                    "template": shared_template,
+                    "character_count": len(shared_template),
+                    "word_count": len(shared_template.split())
+                }
+
+    return prompts_obj
+
+
 @router.get("/")
 async def get_triggers():
     """
@@ -790,14 +899,14 @@ async def update_model_config(trigger_name: str, model_config: dict):
     Args:
         trigger_name: Trigger identifier
         model_config: Configuration object with:
-            - selected_models: List of model IDs (e.g., ["gpt-4o", "claude-sonnet-4-5"])
+            - selected_models: Array of model IDs for testing (e.g., ["gpt-4o", "claude-sonnet-4-5"])
             - temperature: Generation temperature (0.0-1.0)
             - max_tokens: Maximum tokens to generate (50-4000)
 
     Example:
         ```json
         {
-            "selected_models": ["gpt-4o", "claude-sonnet-4-5", "gemini-2.0-flash"],
+            "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
             "temperature": 0.7,
             "max_tokens": 500
         }
@@ -820,7 +929,7 @@ async def update_model_config(trigger_name: str, model_config: dict):
         temperature = model_config.get("temperature", 0.7)
         max_tokens = model_config.get("max_tokens", 500)
 
-        # Validation: At least one model required
+        # Validation: At least one model is required for testing
         if not selected_models or not isinstance(selected_models, list) or len(selected_models) == 0:
             raise HTTPException(status_code=400, detail="At least one model must be selected")
 
@@ -832,21 +941,21 @@ async def update_model_config(trigger_name: str, model_config: dict):
         if not isinstance(max_tokens, int) or max_tokens < 50 or max_tokens > 4000:
             raise HTTPException(status_code=400, detail="Max tokens must be between 50 and 4000")
 
-        # Validate model IDs against available models
+        # Validate all model IDs against available models
         from ..llm_providers import ProviderRegistry
         available_models = ProviderRegistry.list_available_models()
         available_model_ids = {model["model_id"] for model in available_models}
 
-        invalid_models = [model_id for model_id in selected_models if model_id not in available_model_ids]
-        if invalid_models:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid model IDs: {', '.join(invalid_models)}. Use /api/news/models to see available models."
-            )
+        for model_id in selected_models:
+            if model_id not in available_model_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid model ID: {model_id}. Use /api/news/models to see available models."
+                )
 
-        # Build model_config_data object
+        # Build model_config object (array format for testing multiple models)
         model_config_data = {
-            "selected_models": selected_models,
+            "selected_models": selected_models,  # Array of model IDs for testing
             "temperature": temperature,
             "max_tokens": max_tokens,
             "updated_at": datetime.utcnow()
@@ -864,7 +973,7 @@ async def update_model_config(trigger_name: str, model_config: dict):
                 {"_id": latest_draft["_id"]},
                 {
                     "$set": {
-                        "model_config_data": model_config_data,
+                        "llm_config": model_config_data,  # Use llm_config (renamed to avoid Pydantic conflict)
                         "saved_at": datetime.utcnow()
                     }
                 }
@@ -877,7 +986,7 @@ async def update_model_config(trigger_name: str, model_config: dict):
             new_draft = {
                 "trigger_name": trigger_name,
                 "prompts": {},  # Empty prompts, will be filled later
-                "model_config_data": model_config_data,
+                "llm_config": model_config_data,  # Use llm_config (renamed to avoid Pydantic conflict)
                 "data_config": None,
                 "saved_by": "system",
                 "saved_at": datetime.utcnow(),
@@ -891,13 +1000,13 @@ async def update_model_config(trigger_name: str, model_config: dict):
 
         logger.info(
             f"Saved model config to draft for trigger '{trigger_name}': "
-            f"{len(selected_models)} model(s), temp={temperature}, max_tokens={max_tokens}"
+            f"models={selected_models}, temp={temperature}, max_tokens={max_tokens}"
         )
 
         return {
             "success": True,
             "message": f"Model configuration saved to draft for '{trigger_name}'",
-            "model_config": model_config_data,
+            "llm_config": model_config_data,
             "models_count": len(selected_models),
             "is_draft": True,
             "version": version
@@ -942,23 +1051,26 @@ async def get_model_config(trigger_name: str):
         model_config_data = None
         is_draft = False
 
-        if draft_doc and draft_doc.get("model_config_data"):
-            # Use draft configuration
-            model_config_data = draft_doc.get("model_config_data", {})
-            is_draft = True
-        else:
+        if draft_doc:
+            # Check for llm_config (new) and old field names (model_config, model_config_data) for backward compatibility
+            model_config_data = draft_doc.get("llm_config") or draft_doc.get("model_config") or draft_doc.get("model_config_data")
+            if model_config_data:
+                is_draft = True
+
+        if not model_config_data:
             # Fall back to published configuration
             trigger_doc = await db.trigger_prompts.find_one({"trigger_name": trigger_name})
             if trigger_doc:
-                model_config_data = trigger_doc.get("model_config_data", {})
+                # Check for llm_config (new) and old field names (model_config, model_config_data) for backward compatibility
+                model_config_data = trigger_doc.get("llm_config") or trigger_doc.get("model_config") or trigger_doc.get("model_config_data")
                 is_draft = False
 
         # Return defaults if no configuration found
         if not model_config_data:
             return {
                 "trigger_name": trigger_name,
-                "model_config": {
-                    "selected_models": [],
+                "llm_config": {
+                    "selected_models": [],  # Empty array for testing
                     "temperature": 0.7,
                     "max_tokens": 500,
                     "updated_at": None
@@ -968,17 +1080,27 @@ async def get_model_config(trigger_name: str):
                 "message": "No model configuration set. Use POST to configure models."
             }
 
+        # Handle both formats: selected_models array (testing) or model string (legacy)
+        selected_models = model_config_data.get("selected_models")
+        if selected_models and isinstance(selected_models, list):
+            # Current format: array for testing
+            pass
+        elif model_config_data.get("model"):
+            # Legacy format: single model string - convert to array
+            selected_models = [model_config_data.get("model")]
+        else:
+            selected_models = []
+
         return {
             "trigger_name": trigger_name,
-            "model_config": {
-                "selected_models": model_config_data.get("selected_models", []),
+            "llm_config": {
+                "selected_models": selected_models,  # Array for testing multiple models
                 "temperature": model_config_data.get("temperature", 0.7),
                 "max_tokens": model_config_data.get("max_tokens", 500),
                 "updated_at": model_config_data.get("updated_at").isoformat() if model_config_data.get("updated_at") else None
             },
-            "is_configured": True,
-            "is_draft": is_draft,
-            "models_count": len(model_config_data.get("selected_models", []))
+            "is_configured": len(selected_models) > 0,
+            "is_draft": is_draft
         }
 
     except HTTPException:
@@ -1021,10 +1143,16 @@ async def save_complete_draft(trigger_name: str, draft_data: dict):
     This saves to trigger_prompt_drafts. Use /publish endpoint to make changes live.
     """
     try:
+        # Get database connection
+        db = get_database()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
         # Extract components from payload
         prompts_data = draft_data.get("prompts", {})
-        model_config = draft_data.get("model_config", {})
+        model_config = draft_data.get("llm_config", {})
         data_config = draft_data.get("data_config", {})
+        variant_strategy = draft_data.get("variant_strategy", "all_same")
         saved_by = draft_data.get("saved_by", "system")
 
         # Validate trigger exists
@@ -1038,12 +1166,22 @@ async def save_complete_draft(trigger_name: str, draft_data: dict):
             sort=[("version", -1)]
         )
 
+        # Apply variant strategy mapping to prompts
+        processed_prompts = apply_variant_strategy_mapping(prompts_data, variant_strategy)
+
+        if not processed_prompts:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid prompts after applying variant strategy. Please fill at least one prompt."
+            )
+
         # Prepare complete draft document
         draft_document = {
             "trigger_name": trigger_name,
-            "prompts": prompts_data,
-            "model_config_data": model_config if model_config else None,
+            "prompts": processed_prompts,  # Use processed prompts with strategy applied
+            "llm_config": model_config if model_config else None,
             "data_config": data_config if data_config else None,
+            "variant_strategy": variant_strategy,  # Save variant strategy with draft
             "saved_by": saved_by,
             "saved_at": datetime.utcnow(),
             "is_draft": True,
@@ -1074,7 +1212,7 @@ async def save_complete_draft(trigger_name: str, draft_data: dict):
             "saved_at": draft_document["saved_at"].isoformat(),
             "components_saved": {
                 "prompts": len(prompts_data),
-                "model_config": bool(model_config),
+                "llm_config": bool(model_config),
                 "data_config": bool(data_config)
             }
         }
@@ -1099,12 +1237,26 @@ async def publish_draft(trigger_name: str, publish_data: dict = None):
 
     Optional payload:
     {
-        "published_by": "user123"  // optional, who published
+        "published_by": "user123",  // optional, who published
+        "notes": "Publishing notes",  // optional publishing notes
+        "model_settings": {  // optional, override model selection
+            "selected_models": ["gpt-4o"],  // MUST contain exactly 1 model
+            "temperature": 0.7,
+            "max_tokens": 1000
+        }
     }
+
+    If model_settings is provided, it will be used instead of the draft's model_config_data.
+    This allows selecting a single production model at publish time.
 
     After publishing, the draft remains in trigger_prompt_drafts for history tracking.
     """
     try:
+        # Get database connection
+        db = get_database()
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not connected")
+
         # Find latest draft for this trigger
         latest_draft = await db.trigger_prompt_drafts.find_one(
             {"trigger_name": trigger_name},
@@ -1117,10 +1269,60 @@ async def publish_draft(trigger_name: str, publish_data: dict = None):
                 detail=f"No draft found for trigger '{trigger_name}'. Save a draft first before publishing."
             )
 
-        # Extract published_by from payload if provided
+        # Extract payload parameters
         published_by = "system"
+        publishing_notes = ""
+
+        # Build model_config for production (provider + model + temperature)
+        llm_config_draft = latest_draft.get("llm_config", {})
+
+        # Helper function to determine provider from model name
+        def get_provider_from_model(model_name):
+            model_lower = model_name.lower()
+            if "gpt" in model_lower:
+                return "openai"
+            elif "claude" in model_lower:
+                return "anthropic"
+            elif "gemini" in model_lower:
+                return "google"
+            return "openai"  # default
+
         if publish_data and isinstance(publish_data, dict):
             published_by = publish_data.get("published_by", "system")
+            publishing_notes = publish_data.get("notes", "")
+
+            # Check if user provided model at publish time
+            if "model_settings" in publish_data:
+                user_model_settings = publish_data["model_settings"]
+                user_models = user_model_settings.get("selected_models", [])
+
+                if len(user_models) != 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Exactly one model must be selected for production. "
+                               f"Received {len(user_models)} models."
+                    )
+
+                selected_model = user_models[0]
+                temperature = user_model_settings.get("temperature", 0.7)
+                logger.info(f"Using user-selected model for production: {selected_model}")
+            else:
+                # Use from draft
+                draft_models = llm_config_draft.get("selected_models", [])
+                selected_model = draft_models[0] if draft_models else "gpt-4o-mini"
+                temperature = llm_config_draft.get("temperature", 0.7)
+        else:
+            # No publish_data provided, use from draft
+            draft_models = llm_config_draft.get("selected_models", [])
+            selected_model = draft_models[0] if draft_models else "gpt-4o-mini"
+            temperature = llm_config_draft.get("temperature", 0.7)
+
+        # Build production model_config structure (provider, model, temperature)
+        model_config_to_use = {
+            "provider": get_provider_from_model(selected_model),
+            "model": selected_model,
+            "temperature": temperature
+        }
 
         # Check if trigger exists in production
         existing_trigger = await db.trigger_prompts.find_one({"trigger_name": trigger_name})
@@ -1131,22 +1333,45 @@ async def publish_draft(trigger_name: str, publish_data: dict = None):
                 detail=f"Trigger '{trigger_name}' not found in trigger_prompts collection"
             )
 
-        # Prepare published document (copy from draft)
-        published_document = {
-            "trigger_name": trigger_name,
-            "prompts": latest_draft.get("prompts", {}),
-            "model_config_data": latest_draft.get("model_config_data"),
-            "data_config": latest_draft.get("data_config"),
-            "published_by": published_by,
-            "published_at": datetime.utcnow(),
-            "is_draft": False,
-            "draft_version_published": latest_draft.get("version", 1)
+        # Transform data_config to production format (handle field name differences)
+        draft_data_config = latest_draft.get("data_config", {})
+        production_data_config = {
+            "sections": draft_data_config.get("sections", draft_data_config.get("selected_sections", [])),
+            "section_order": draft_data_config.get("section_order", []),
+            "data_mode": draft_data_config.get("data_mode", "new")
         }
 
-        # Update the trigger_prompts collection
+        # Transform prompts: extract template strings from draft objects for production
+        published_prompts = {}
+        for prompt_type, prompt_data in latest_draft.get("prompts", {}).items():
+            if isinstance(prompt_data, dict) and "template" in prompt_data:
+                # Extract template string from draft object
+                published_prompts[prompt_type] = prompt_data["template"]
+            elif isinstance(prompt_data, str):
+                # Already a string (backward compatibility)
+                published_prompts[prompt_type] = prompt_data
+
+        # Get current version and increment for new publication
+        current_version = existing_trigger.get("version", 0)
+        new_version = current_version + 1
+
+        # Prepare update fields (only update CMS-managed configuration, preserve other fields)
+        update_fields = {
+            "prompts": published_prompts,  # {paid, unpaid, crawler} as plain strings
+            "model_config": model_config_to_use,  # {provider, model, temperature}
+            "data_config": production_data_config,  # {sections, section_order, data_mode}
+            "variant_strategy": latest_draft.get("variant_strategy", "all_same"),
+            "system_prompt": latest_draft.get("system_prompt", ""),  # System prompt if exists
+            "version": new_version,  # Incremented version number
+            "updated_at": datetime.utcnow(),  # Timestamp of update
+            "published_at": datetime.utcnow(),  # Timestamp of publication
+            "published_by": published_by  # User who published
+        }
+
+        # Update the trigger_prompts collection (only update specified fields)
         update_result = await db.trigger_prompts.update_one(
             {"trigger_name": trigger_name},
-            {"$set": published_document}
+            {"$set": update_fields}
         )
 
         if update_result.modified_count == 0:
@@ -1165,13 +1390,15 @@ async def publish_draft(trigger_name: str, publish_data: dict = None):
             "success": True,
             "message": f"Draft published successfully for '{trigger_name}'",
             "trigger_name": trigger_name,
-            "published_at": published_document["published_at"].isoformat(),
-            "draft_version_published": latest_draft.get("version", 1),
+            "version": new_version,
+            "published_at": update_fields["published_at"].isoformat(),
+            "updated_at": update_fields["updated_at"].isoformat(),
             "published_by": published_by,
             "components_published": {
-                "prompts": len(latest_draft.get("prompts", {})),
-                "model_config": bool(latest_draft.get("model_config_data")),
-                "data_config": bool(latest_draft.get("data_config"))
+                "prompts": len(published_prompts),
+                "model_config": bool(model_config_to_use),
+                "data_config": bool(production_data_config),
+                "variant_strategy": update_fields["variant_strategy"]
             }
         }
 
@@ -1315,10 +1542,10 @@ async def validate_configuration(trigger_name: str, validation_data: dict):
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
 
 
-@router.post("/{trigger_name}/publish")
+@router.post("/{trigger_name}/publish-new")
 async def publish_configuration(trigger_name: str, publish_data: dict):
     """
-    Publish trigger configuration to production (Story 5.2)
+    Publish trigger configuration to production (Story 5.2 - New workflow)
 
     Request body:
     {

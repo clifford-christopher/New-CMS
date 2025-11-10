@@ -33,7 +33,7 @@ export interface ModelConfig {
  */
 export interface ModelConfigResponse {
   trigger_name: string;
-  model_config: ModelConfig;
+  llm_config: ModelConfig;  // Changed from model_config to llm_config to match backend
   is_configured: boolean;
   models_count?: number;
   message?: string;

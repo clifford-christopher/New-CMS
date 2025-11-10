@@ -5,7 +5,7 @@
  * Service for validating trigger configurations before publishing
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
 export interface ValidationRequest {
   apis: string[];

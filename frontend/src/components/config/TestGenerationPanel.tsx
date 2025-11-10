@@ -34,31 +34,35 @@ const TestGenerationPanel: React.FC = () => {
   // Convert Set to Array for prompt types
   const promptTypesArray = Array.from(checkedTypes) as PromptType[];
 
-  // Build version dropdown options
-  const versionOptions: VersionOption[] = [];
+  // Calculate total generations (selected models × prompt types)
+  const totalGenerations = selectedModels.length * promptTypesArray.length;
 
-  resultVersions.forEach((versions, key) => {
-    versions.forEach((version, index) => {
-      const [modelId, promptType] = key.split('-');
-      versionOptions.push({
-        key: `${key}-v${version.version}`,
-        label: `v${version.version} - ${version.result.response.model_name} (${promptType}) - ${new Date(version.timestamp).toLocaleString()}`,
-        modelId,
-        promptType: promptType as PromptType,
-        versionIndex: index,
-        version: version.version,
-        timestamp: version.timestamp
+  // Build version dropdown options (memoized to prevent recalculation on every render)
+  const versionOptions = React.useMemo(() => {
+    const options: VersionOption[] = [];
+
+    resultVersions.forEach((versions, key) => {
+      versions.forEach((version, index) => {
+        const [modelId, promptType] = key.split('-');
+        options.push({
+          key: `${key}-v${version.version}`,
+          label: `v${version.version} - ${version.result.response.model_name} (${promptType}) - ${new Date(version.timestamp).toLocaleString()}`,
+          modelId,
+          promptType: promptType as PromptType,
+          versionIndex: index,
+          version: version.version,
+          timestamp: version.timestamp
+        });
       });
     });
-  });
 
-  // Sort by timestamp (newest first)
-  versionOptions.sort((a, b) =>
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+    // Sort by timestamp (newest first)
+    options.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
-  // Calculate total generations
-  const totalGenerations = selectedModels.length * promptTypesArray.length;
+    return options;
+  }, [resultVersions]);
 
   // Check if prompt has placeholders
   const hasPlaceholders = (content: string): boolean => {
@@ -117,7 +121,7 @@ const TestGenerationPanel: React.FC = () => {
       await triggerGeneration({
         triggerId,
         stockId,
-        modelIds: selectedModels,
+        modelIds: selectedModels, // Pass multiple models for testing
         promptTypes: promptTypesArray,
         promptTemplates, // Pass in-memory prompt templates
         structuredData,

@@ -7,14 +7,14 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.BACKEND_URL || 'http://localhost:8000/api/:path*',
+        destination: process.env.BACKEND_URL || 'http://localhost:8001/api/:path*',
       },
     ];
   },
 
   // Environment variables exposed to the browser
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001',
   },
 
   // Disable x-powered-by header

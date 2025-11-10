@@ -61,8 +61,8 @@ class TriggerPromptDraft(BaseModel):
     trigger_name: str = Field(..., description="Trigger identifier (e.g., '52wk_high')")
     prompts: PromptTemplates = Field(..., description="All prompt templates (paid, unpaid, crawler)")
 
-    # Model configuration (added for complete draft storage)
-    model_config_data: Optional[Dict[str, Any]] = Field(
+    # LLM configuration (renamed from model_config to avoid Pydantic reserved name conflict)
+    llm_config: Optional[Dict[str, Any]] = Field(
         default=None,
         description="LLM model configuration (selected_models, temperature, max_tokens)"
     )
@@ -106,7 +106,7 @@ class TriggerPromptDraft(BaseModel):
                         "word_count": 63
                     }
                 },
-                "model_config_data": {
+                "llm_config": {
                     "selected_models": ["gpt-4o", "claude-sonnet-4-5"],
                     "temperature": 0.7,
                     "max_tokens": 500

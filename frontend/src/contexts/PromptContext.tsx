@@ -166,6 +166,16 @@ export function PromptProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Auto-replicate paid prompt to unpaid/crawler when all_same strategy is selected
+  useEffect(() => {
+    if (variantStrategy === 'all_same' && prompts.paid.content) {
+      setPrompts(prev => ({
+        paid: prev.paid,
+        unpaid: { ...prev.unpaid, content: prev.paid.content, ...calculateStats(prev.paid.content) },
+        crawler: { ...prev.crawler, content: prev.paid.content, ...calculateStats(prev.paid.content) }
+      }));
+    }
+  }, [variantStrategy, prompts.paid.content]);
 
   const setEditorTheme = (theme: 'vs-light' | 'vs-dark') => {
     setEditorThemeState(theme);

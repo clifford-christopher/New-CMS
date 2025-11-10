@@ -292,7 +292,7 @@ export default function PromptEditor({ triggerId }: PromptEditorProps) {
           <Alert variant="info" className="m-3 mb-0">
             <i className="bi bi-info-circle me-2"></i>
             <strong>Tip:</strong> Use placeholders to reference your data sections.
-            For example, <code>{'{{section_1}}'}</code> for a section or <code>{'{data.field}'}</code> for a data field.
+            For example, <code>{'{{section_1}}'}</code> for a section or <code>{'{{data.field}}'}</code> for a data field.
             Start typing <code>{'{{'}}</code> to see autocomplete suggestions.
           </Alert>
 

@@ -70,12 +70,11 @@ const VersionDropdown: React.FC<VersionDropdownProps> = ({
     }
   };
 
-  if (versionOptions.length === 0 && !isLoading) {
-    return null;
-  }
+  // Show component even when no versions (instead of unmounting) to prevent flicker
+  const hasVersions = versionOptions.length > 0;
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4" style={{ display: (!hasVersions && !isLoading) ? 'none' : 'block' }}>
       <Card.Header>
         <h5 className="mb-0">
           <i className="bi bi-clock-history me-2"></i>

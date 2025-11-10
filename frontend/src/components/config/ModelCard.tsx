@@ -6,7 +6,7 @@
  * - Model name and provider
  * - Description
  * - Pricing information
- * - Selection checkbox
+ * - Selection checkbox (multiple selection for testing)
  */
 
 import React from 'react';

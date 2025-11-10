@@ -114,8 +114,8 @@ const ModelSelection: React.FC = () => {
           <Alert variant="info" className="mb-0">
             <small>
               <i className="bi bi-lightbulb me-2"></i>
-              <strong>Tip:</strong> Model selection applies to all prompt types (paid, unpaid, crawler).
-              Select multiple models to compare results side-by-side.
+              <strong>Tip:</strong> Select multiple models to compare results side-by-side during testing.
+              When publishing to production, you'll choose exactly one model to use.
             </small>
           </Alert>
         </Card.Body>

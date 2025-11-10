@@ -28,16 +28,20 @@ const GenerationResultsView: React.FC = () => {
   };
 
   // Filter tabs that have results
-  const availableTabs = (Object.keys(resultsByType) as PromptType[]).filter(
-    type => resultsByType[type].length > 0
-  );
+  const availableTabs = React.useMemo(() => {
+    return (Object.keys(resultsByType) as PromptType[]).filter(
+      type => resultsByType[type].length > 0
+    );
+  }, [resultsByType]);
 
-  // Set default active tab to first available
+  // Set default active tab to first available (only when truly needed)
   React.useEffect(() => {
-    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
+    if (availableTabs.length > 0 && activeTab && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    } else if (availableTabs.length > 0 && !activeTab) {
       setActiveTab(availableTabs[0]);
     }
-  }, [availableTabs, activeTab]);
+  }, [availableTabs]); // Remove activeTab from dependencies to prevent flicker
 
   // Early return AFTER all hooks
   if (results.length === 0) {

@@ -91,15 +91,18 @@ export const GenerationProvider: React.FC<GenerationProviderProps> = ({ children
   // Store last generation params for regeneration
   const [lastGenerationParams, setLastGenerationParams] = useState<GenerationParams | null>(null);
 
-  // Auto-load history when triggerId changes
+  // Auto-load history when triggerId changes (only once per triggerId)
+  const hasLoadedHistoryRef = React.useRef(false);
   React.useEffect(() => {
-    if (triggerId && results.length === 0 && !historyLoading) {
+    if (triggerId && results.length === 0 && !historyLoading && !hasLoadedHistoryRef.current) {
+      hasLoadedHistoryRef.current = true;
       fetchHistory({
         trigger_name: triggerId,
         limit: 50
       });
     }
-  }, [triggerId]); // Only depend on triggerId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerId]); // Only depend on triggerId to prevent re-render loops
 
   /**
    * Trigger batch generation

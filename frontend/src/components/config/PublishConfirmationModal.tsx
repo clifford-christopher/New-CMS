@@ -6,8 +6,9 @@
  */
 
 import React, { useState } from 'react';
-import { Modal, Button, Alert, Card, Badge, Table, Form } from 'react-bootstrap';
+import { Modal, Button, Alert, Card, Badge, Table, Form, Accordion } from 'react-bootstrap';
 import { TestMetadata } from '@/services/validationService';
+import { getStrategyRequirements } from '@/types/generation';
 
 interface PublishConfirmationModalProps {
   show: boolean;
@@ -18,10 +19,13 @@ interface PublishConfirmationModalProps {
     section_order: string[];
     prompts: Record<string, string>;
     model_settings: {
-      selected_models: string[];
+      model?: string; // New format: single model string
+      selected_models?: string[]; // Old format: for backward compatibility
       temperature: number;
       max_tokens: number;
     };
+    data_mode?: string;
+    variant_strategy?: string;
   };
   testResults: Record<string, TestMetadata>; // Test results by prompt type
   onConfirm: (publishData: PublishData) => void;
@@ -46,6 +50,7 @@ export interface PublishData {
   }>;
   published_by: string;
   notes?: string;
+  selected_model?: string; // Single model selected for production at publish time
 }
 
 const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
@@ -59,6 +64,17 @@ const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
 }) => {
   const [publishNotes, setPublishNotes] = useState('');
   const [understood, setUnderstood] = useState(false);
+  // Single model selection for production - default to configured model or first from array
+  const [selectedModel, setSelectedModel] = useState<string>(
+    configuration.model_settings.model ||
+    configuration.model_settings.selected_models?.[0] ||
+    ''
+  );
+
+  // Get available models (handle both formats)
+  const availableModels = configuration.model_settings.model
+    ? [configuration.model_settings.model]
+    : (configuration.model_settings.selected_models || []);
 
   const handlePublish = () => {
     // Prepare test results summary
@@ -88,7 +104,8 @@ const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
       model_settings: configuration.model_settings,
       test_results_summary,
       published_by: 'user123', // TODO: Get from auth context
-      notes: publishNotes.trim() || undefined
+      notes: publishNotes.trim() || undefined,
+      selected_model: selectedModel // Single model for production
     };
 
     onConfirm(publishData);
@@ -129,46 +146,121 @@ const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
           </div>
         </Alert>
 
-        {/* Configuration Summary */}
+        {/* Data Configuration */}
         <Card className="mb-3">
           <Card.Header className="bg-light">
-            <strong>Configuration Summary</strong>
+            <strong><i className="bi bi-database me-2"></i>Data Configuration</strong>
           </Card.Header>
           <Card.Body>
             <div className="row g-3">
               <div className="col-md-6">
                 <div className="mb-2">
-                  <small className="text-muted">APIs Configured:</small>
-                  <div>
-                    {configuration.apis.map((api, idx) => (
-                      <Badge key={idx} bg="info" className="me-1">{api}</Badge>
-                    ))}
-                  </div>
+                  <small className="text-muted d-block mb-1">Data Mode:</small>
+                  <Badge bg={
+                    configuration.data_mode === 'OLD' ? 'secondary' :
+                    configuration.data_mode === 'NEW' ? 'success' : 'warning'
+                  } style={{ fontSize: '14px', padding: '6px 12px' }}>
+                    {configuration.data_mode || 'Not configured'}
+                  </Badge>
                 </div>
+              </div>
+              <div className="col-md-6">
                 <div className="mb-2">
-                  <small className="text-muted">Section Order:</small>
+                  <small className="text-muted d-block mb-1">Sections Selected:</small>
+                  <Badge bg="info" style={{ fontSize: '14px', padding: '6px 12px' }}>
+                    {configuration.section_order.length} sections
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="mt-2">
+              <small className="text-muted d-block mb-1">Section Order:</small>
+              <div className="d-flex flex-wrap gap-1">
+                {configuration.section_order.map((section, idx) => (
+                  <Badge key={idx} bg="secondary" className="me-1">
+                    {idx + 1}. {section}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+
+        {/* Prompt Configuration */}
+        <Card className="mb-3">
+          <Card.Header className="bg-light">
+            <strong><i className="bi bi-code-slash me-2"></i>Prompt Configuration</strong>
+          </Card.Header>
+          <Card.Body>
+            {configuration.variant_strategy && (
+              <div className="mb-3 pb-3 border-bottom">
+                <small className="text-muted d-block mb-1">Content Variation Strategy:</small>
+                <div>
+                  <Badge bg="primary" style={{ fontSize: '13px', padding: '6px 12px' }}>
+                    {configuration.variant_strategy.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  </Badge>
+                  <Badge bg="info" className="ms-2" style={{ fontSize: '12px' }}>
+                    {getStrategyRequirements(configuration.variant_strategy as any).apiCalls} API call(s)
+                  </Badge>
+                </div>
+                <small className="text-muted d-block mt-1">
+                  {getStrategyRequirements(configuration.variant_strategy as any).description}
+                </small>
+              </div>
+            )}
+            <Accordion>
+              {Object.entries(configuration.prompts).map(([promptType, content]) => (
+                <Accordion.Item eventKey={promptType} key={promptType}>
+                  <Accordion.Header>
+                    <strong style={{ textTransform: 'capitalize' }}>{promptType}</strong>
+                    <Badge bg="light" text="dark" className="ms-2" style={{ fontSize: '11px' }}>
+                      {content.length} characters
+                    </Badge>
+                  </Accordion.Header>
+                  <Accordion.Body>
+                    <div style={{
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      fontFamily: 'monospace',
+                      fontSize: '12px',
+                      background: '#f8f9fa',
+                      padding: '12px',
+                      borderRadius: '4px'
+                    }}>
+                      {content.substring(0, 500)}
+                      {content.length > 500 && <span className="text-muted">... (truncated)</span>}
+                    </div>
+                  </Accordion.Body>
+                </Accordion.Item>
+              ))}
+            </Accordion>
+          </Card.Body>
+        </Card>
+
+        {/* Model Configuration */}
+        <Card className="mb-3">
+          <Card.Header className="bg-light">
+            <strong><i className="bi bi-cpu me-2"></i>Model Configuration</strong>
+          </Card.Header>
+          <Card.Body>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div className="mb-2">
+                  <small className="text-muted d-block mb-1">Configured Model:</small>
                   <div>
-                    {configuration.section_order.map((section, idx) => (
-                      <Badge key={idx} bg="secondary" className="me-1">{section}</Badge>
+                    {availableModels.map((model, idx) => (
+                      <Badge key={idx} bg="success" className="me-1">{model}</Badge>
                     ))}
                   </div>
                 </div>
               </div>
               <div className="col-md-6">
                 <div className="mb-2">
-                  <small className="text-muted">Models Selected:</small>
-                  <div>
-                    {configuration.model_settings.selected_models.map((model, idx) => (
-                      <Badge key={idx} bg="success" className="me-1">{model}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <small className="text-muted">Temperature:</small>
+                  <small className="text-muted d-block">Temperature:</small>
                   <strong className="ms-2">{configuration.model_settings.temperature}</strong>
                 </div>
                 <div>
-                  <small className="text-muted">Max Tokens:</small>
+                  <small className="text-muted d-block">Max Tokens:</small>
                   <strong className="ms-2">{configuration.model_settings.max_tokens}</strong>
                 </div>
               </div>
@@ -252,6 +344,67 @@ const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
           </Card.Body>
         </Card>
 
+        {/* Production Model Selection */}
+        <Card className="mb-3" style={{ borderColor: '#0d6efd', borderWidth: '2px' }}>
+          <Card.Header className="bg-primary text-white">
+            <strong><i className="bi bi-cpu me-2"></i>Select Production Model</strong>
+            <Badge bg="light" text="dark" className="ms-2">Required</Badge>
+          </Card.Header>
+          <Card.Body>
+            <Alert variant="info" style={{ fontSize: '14px', marginBottom: '16px' }}>
+              <i className="bi bi-info-circle me-2"></i>
+              <strong>Choose exactly ONE model</strong> to use in production. You can select a different model than what was used for testing.
+            </Alert>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {availableModels.map((model) => {
+                // Check if this model was tested
+                const testedInPromptTypes = Object.entries(testResults)
+                  .filter(([_, metadata]) => metadata.models_tested.includes(model))
+                  .map(([promptType]) => promptType);
+                const wasTested = testedInPromptTypes.length > 0;
+
+                return (
+                  <Form.Check
+                    key={model}
+                    type="radio"
+                    name="production-model"
+                    id={`model-${model}`}
+                    value={model}
+                    checked={selectedModel === model}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={isPublishing}
+                    label={
+                      <span style={{ fontSize: '15px' }}>
+                        <strong>{model}</strong>
+                        {wasTested && (
+                          <Badge bg="success" className="ms-2" style={{ fontSize: '11px' }}>
+                            <i className="bi bi-check-circle me-1"></i>
+                            Tested ({testedInPromptTypes.join(', ')})
+                          </Badge>
+                        )}
+                        {!wasTested && (
+                          <Badge bg="warning" className="ms-2" style={{ fontSize: '11px' }}>
+                            <i className="bi bi-exclamation-triangle me-1"></i>
+                            Not tested
+                          </Badge>
+                        )}
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            {!selectedModel && (
+              <Alert variant="warning" style={{ marginTop: '12px', marginBottom: '0', fontSize: '13px' }}>
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                Please select a model to continue with publishing.
+              </Alert>
+            )}
+          </Card.Body>
+        </Card>
+
         {/* Publishing Notes */}
         <Form.Group className="mb-3">
           <Form.Label>
@@ -301,7 +454,8 @@ const PublishConfirmationModal: React.FC<PublishConfirmationModalProps> = ({
         <Button
           variant="primary"
           onClick={handlePublish}
-          disabled={!understood || isPublishing}
+          disabled={!understood || isPublishing || !selectedModel}
+          title={!selectedModel ? 'Please select a model for production' : ''}
         >
           {isPublishing ? (
             <>

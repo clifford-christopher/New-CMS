@@ -12,7 +12,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { GenerationResult, VariantStrategy, getStrategyRequirements } from '@/types/generation';
 import { Container, Row, Col, Card, Form, Button, Alert, Badge, Spinner, Dropdown } from 'react-bootstrap';
 import SectionManagementPanel, { Section, DEFAULT_SECTIONS } from '@/components/SectionManagementPanel';
@@ -24,13 +24,16 @@ import { PromptProvider, usePrompt } from '@/contexts/PromptContext';
 import { ValidationProvider } from '@/contexts/ValidationContext';
 import { PreviewProvider } from '@/contexts/PreviewContext';
 import { DataProvider } from '@/contexts/DataContext';
-import { ModelProvider } from '@/contexts/ModelContext';
+import { ModelProvider, useModel } from '@/contexts/ModelContext';
 import { GenerationProvider, useGeneration } from '@/contexts/GenerationContext';
 import { SectionData } from '@/types/validation';
 import ModelSelection from '@/components/config/ModelSelection';
 import TestGenerationPanel from '@/components/config/TestGenerationPanel';
 import GenerationHistoryPanel from '@/components/config/GenerationHistoryPanel';
 import ComparisonView from '@/components/config/ComparisonView';
+import PublishConfirmationModal from '@/components/config/PublishConfirmationModal';
+import ConfigVersionHistoryModal from '@/components/config/ConfigVersionHistoryModal';
+import WorkflowGuideTour from '@/components/config/WorkflowGuideTour';
 
 interface PageProps {
   params: { triggerId: string };
@@ -75,6 +78,144 @@ const ResultsStepWrapper: React.FC<{ triggerName: string; onNavigateToTesting: (
   );
 };
 
+/**
+ * DraftSaveButton - Button component with access to context providers
+ * This component can safely call usePrompt() and useModel() hooks
+ * because it's rendered inside the provider boundaries
+ */
+interface DraftSaveButtonProps {
+  onSave: (contextData: {
+    prompts: any;
+    variantStrategy: string;
+    selectedModels: string[]; // Multiple models for testing
+    temperature: number;
+    maxTokens: number;
+  }) => Promise<void>;
+  saveStatus: 'idle' | 'saving' | 'success' | 'error';
+}
+
+const DraftSaveButton: React.FC<DraftSaveButtonProps> = ({ onSave, saveStatus }) => {
+  // Safe to call hooks here because this component is inside providers
+  const { prompts, variantStrategy } = usePrompt();
+  const { selectedModels, temperature, maxTokens } = useModel();
+
+  const handleClick = () => {
+    onSave({
+      prompts,
+      variantStrategy,
+      selectedModels, // Multiple models array
+      temperature,
+      maxTokens
+    });
+  };
+
+  return (
+    <Button
+      variant="outline-secondary"
+      onClick={handleClick}
+      disabled={saveStatus === 'saving'}
+      style={{ width: '120px', height: '40px' }}
+    >
+      {saveStatus === 'saving' ? <Spinner as="span" animation="border" size="sm" /> : 'Save Draft'}
+    </Button>
+  );
+};
+
+/**
+ * PublishButton Component - Auto-saves draft before opening publish modal
+ * Must be inside PromptProvider and ModelProvider to access context data
+ */
+interface PublishButtonProps {
+  onPublish: (contextData: {
+    prompts: any;
+    variantStrategy: string;
+    selectedModels: string[];
+    temperature: number;
+    maxTokens: number;
+  }) => Promise<void>;
+  onOpenModal: () => void;
+  disabled: boolean;
+  saveStatus: 'idle' | 'saving' | 'success' | 'error';
+  completedSteps: Record<NavigationStep, boolean>;
+}
+
+const PublishButton: React.FC<PublishButtonProps> = ({
+  onPublish,
+  onOpenModal,
+  disabled,
+  saveStatus,
+  completedSteps
+}) => {
+  const { prompts, variantStrategy } = usePrompt();
+  const { selectedModels, temperature, maxTokens } = useModel();
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+
+  const handleClick = async () => {
+    // Validate all steps completed
+    const allStepsCompleted = Object.values(completedSteps).every(v => v);
+    if (!allStepsCompleted) {
+      alert('Complete all required steps before publishing');
+      return;
+    }
+
+    // Auto-save draft before publishing
+    setIsAutoSaving(true);
+    try {
+      await onPublish({
+        prompts,
+        variantStrategy,
+        selectedModels,
+        temperature,
+        maxTokens
+      });
+
+      // Open the publish modal after successful save
+      onOpenModal();
+    } catch (error) {
+      console.error('Failed to auto-save before publish:', error);
+      alert('Failed to save draft. Please try again.');
+    } finally {
+      setIsAutoSaving(false);
+    }
+  };
+
+  const isDisabled = disabled || saveStatus === 'saving' || isAutoSaving;
+  const showSpinner = saveStatus === 'saving' || isAutoSaving;
+
+  return (
+    <Button
+      variant="primary"
+      onClick={handleClick}
+      disabled={isDisabled}
+      style={{ width: '140px', height: '40px', fontWeight: 600 }}
+      title={!Object.values(completedSteps).every(v => v) ? 'Complete all required steps before publishing' : ''}
+    >
+      {showSpinner ? <Spinner as="span" animation="border" size="sm" /> : 'Publish'}
+    </Button>
+  );
+};
+
+/**
+ * TestingCompletionTracker - Tracks when testing step is complete
+ * Must be inside GenerationProvider to access generation results
+ */
+interface TestingCompletionTrackerProps {
+  onTestingComplete: () => void;
+}
+
+const TestingCompletionTracker: React.FC<TestingCompletionTrackerProps> = ({ onTestingComplete }) => {
+  const { results } = useGeneration(); // Safe - inside GenerationProvider
+
+  useEffect(() => {
+    if (results && results.length > 0) {
+      console.log('Generation results detected:', results.length, 'results - marking testing complete');
+      onTestingComplete();
+    }
+  }, [results, onTestingComplete]);
+
+  return null; // No UI - just tracks completion
+};
+
 export default function ConfigurationPage({ params }: PageProps) {
   const triggerId = params.triggerId;
 
@@ -86,6 +227,7 @@ export default function ConfigurationPage({ params }: PageProps) {
 
   // Post-generation section selection state (NEW mode only)
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]); // Track reordered sections separately
   const [generatedDataCache, setGeneratedDataCache] = useState<Record<string, any[]>>({});
 
   // Prompt type selection
@@ -116,6 +258,16 @@ export default function ConfigurationPage({ params }: PageProps) {
   // Save/publish state
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // Publish modal state
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // Version history modal state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Workflow guide tour state
+  const [showWorkflowGuide, setShowWorkflowGuide] = useState(false);
 
   // Completion tracking
   const [completedSteps, setCompletedSteps] = useState<Record<NavigationStep, boolean>>({
@@ -179,7 +331,7 @@ export default function ConfigurationPage({ params }: PageProps) {
   useEffect(() => {
     const loadDraft = async () => {
       try {
-        const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/drafts/latest`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/triggers/${triggerId}/drafts/latest`);
 
         if (!response.ok) {
           console.warn('Failed to load draft configuration');
@@ -196,14 +348,20 @@ export default function ConfigurationPage({ params }: PageProps) {
           if (draft.data_config) {
             const dataConfig = draft.data_config;
 
-            // Set data mode
+            // Set data mode (convert to uppercase to match frontend DataMode type)
             if (dataConfig.data_mode) {
-              setDataMode(dataConfig.data_mode as DataMode);
+              setDataMode(dataConfig.data_mode.toUpperCase() as DataMode);
             }
 
-            // Set selected sections
-            if (dataConfig.selected_sections && Array.isArray(dataConfig.selected_sections)) {
-              setSelectedSectionIds(dataConfig.selected_sections);
+            // Set selected sections (support both new 'sections' and legacy 'selected_sections')
+            const sections = dataConfig.sections || dataConfig.selected_sections;
+            if (sections && Array.isArray(sections)) {
+              setSelectedSectionIds(sections);
+            }
+
+            // Load section order to preserve arrangement
+            if (dataConfig.section_order && Array.isArray(dataConfig.section_order)) {
+              setSectionOrder(dataConfig.section_order);
             }
           }
 
@@ -240,6 +398,11 @@ export default function ConfigurationPage({ params }: PageProps) {
     setDataStatus('notConfigured');
   }, [stockId]);
 
+  // Callback for TestingCompletionTracker to mark testing step complete
+  const handleTestingComplete = useCallback(() => {
+    setCompletedSteps(prev => ({ ...prev, testing: true }));
+  }, []);
+
   // Validate sections step completion
   useEffect(() => {
     if (dataMode === 'OLD' && oldData) {
@@ -254,6 +417,40 @@ export default function ConfigurationPage({ params }: PageProps) {
     }
   }, [dataMode, oldData, selectedSectionIds]);
 
+  // Step 3: Track prompts completion (callback from PromptEditorWrapper)
+  const handlePromptsValidation = useCallback((isValid: boolean) => {
+    setCompletedSteps(prev => {
+      // Guard: Only update if value actually changed to prevent infinite loops
+      if (prev.prompts === isValid) return prev;
+      return { ...prev, prompts: isValid };
+    });
+  }, []);
+
+  // Step 4: Track testing completion
+  // NOTE: TestingCompletionTracker component (placed inside GenerationProvider) handles this
+  // by monitoring the results array from GenerationContext. No duplicate fetch needed here.
+
+  // Step 5: Track results completion (auto-complete when viewing results)
+  useEffect(() => {
+    if (activeStep === 'results') {
+      // When user views results tab, mark step as complete
+      setCompletedSteps(prev => ({ ...prev, results: true }));
+    }
+  }, [activeStep]);
+
+  // Show workflow guide when step changes (unless user dismissed it)
+  // DISABLED: User doesn't want auto-popup on every step
+  // useEffect(() => {
+  //   const guideDismissed = localStorage.getItem('workflow_guide_dismissed');
+  //   if (!guideDismissed && activeStep) {
+  //     // Show guide after a short delay to let the UI render
+  //     const timer = setTimeout(() => {
+  //       setShowWorkflowGuide(true);
+  //     }, 500);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [activeStep]);
+
   // Handle data mode change
   const handleDataModeChange = (mode: DataMode) => {
     setDataMode(mode);
@@ -262,6 +459,7 @@ export default function ConfigurationPage({ params }: PageProps) {
   // Handle post-generation section selection
   const handleSectionSelection = (sectionIds: string[]) => {
     setSelectedSectionIds(sectionIds);
+    setSectionOrder(sectionIds); // Initialize order same as selection when user manually selects
   };
 
   // Handle prompt type toggle
@@ -288,7 +486,7 @@ export default function ConfigurationPage({ params }: PageProps) {
 
     for (let i = 0; i < maxAttempts; i++) {
       const response = await fetch(
-        `http://localhost:8000/api/data/structured/jobs/${jobId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/data/structured/jobs/${jobId}`
       );
 
       if (!response.ok) {
@@ -317,7 +515,7 @@ export default function ConfigurationPage({ params }: PageProps) {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/stocks/${stockId}/trigger-data?trigger_name=${triggerId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/stocks/${stockId}/trigger-data?trigger_name=${triggerId}`,
         {
           headers: { 'Content-Type': 'application/json' }
         }
@@ -363,7 +561,7 @@ export default function ConfigurationPage({ params }: PageProps) {
     try {
       // Generate NEW structured data - ALWAYS generate ALL 14 sections
       const generateResponse = await fetch(
-        'http://localhost:8000/api/data/structured/generate',
+        `${process.env.NEXT_PUBLIC_API_URL}/api/data/structured/generate`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -393,7 +591,9 @@ export default function ConfigurationPage({ params }: PageProps) {
       setDataStatus('ready');
 
       // Auto-select all sections by default
-      setSelectedSectionIds(sectionsData.map((s: any) => s.section_id));
+      const sectionIds = sectionsData.map((s: any) => s.section_id);
+      setSelectedSectionIds(sectionIds);
+      setSectionOrder(sectionIds); // Initialize order same as selection
 
       setCompletedSteps(prev => ({ ...prev, data: true }));
     } catch (error) {
@@ -416,27 +616,46 @@ export default function ConfigurationPage({ params }: PageProps) {
     }
   }, [dataMode, oldData, newSectionsData]);
 
-  // Save draft
-  const handleSaveDraft = async () => {
+  // Save draft - accepts context data from inner components that have provider access
+  const handleSaveDraft = async (contextData?: {
+    prompts?: any;
+    variantStrategy?: string;
+    selectedModels?: string[]; // Array for testing multiple models
+    temperature?: number;
+    maxTokens?: number;
+  }) => {
     setSaveStatus('saving');
     setErrorMessage('');
 
     try {
-      // Build draft payload from current page state
-      // Note: This saves the structure to drafts. Prompts and model config
-      // are saved separately through their respective contexts.
+      // Build complete draft payload from passed context data
       const draftPayload = {
-        prompts: {}, // Prompts are managed by PromptContext, saved separately
-        model_config: {}, // Model config managed by ModelContext, saved separately
-        data_config: {
-          data_mode: dataMode,
-          selected_sections: selectedSectionIds,
-          section_order: selectedSectionIds
+        prompts: {
+          paid: { template: contextData?.prompts?.paid?.content || '' },
+          unpaid: { template: contextData?.prompts?.unpaid?.content || '' },
+          crawler: { template: contextData?.prompts?.crawler?.content || '' }
         },
+        llm_config: {
+          selected_models: contextData?.selectedModels || [], // Array for testing multiple models
+          temperature: contextData?.temperature ?? 0.7,
+          max_tokens: contextData?.maxTokens ?? 1000
+        },
+        data_config: {
+          sections: dataMode === 'OLD_NEW'
+            ? ['old_data', ...selectedSectionIds]  // Include OLD section for OLD_NEW mode
+            : selectedSectionIds,
+          section_order: sectionOrder.length > 0
+            ? sectionOrder
+            : (dataMode === 'OLD_NEW'
+                ? ['old_data', ...selectedSectionIds]  // Default order includes OLD section
+                : selectedSectionIds),
+          data_mode: dataMode.toLowerCase()  // Convert to lowercase to match backend enum
+        },
+        variant_strategy: contextData?.variantStrategy || 'all_same',
         saved_by: "system" // TODO: Replace with actual user ID when auth is implemented
       };
 
-      const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/drafts`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/triggers/${triggerId}/drafts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -461,27 +680,46 @@ export default function ConfigurationPage({ params }: PageProps) {
     }
   };
 
-  // Publish configuration
-  const handlePublish = async () => {
+  // Open publish modal
+  const handlePublish = () => {
     const allStepsCompleted = Object.values(completedSteps).every(v => v);
     if (!allStepsCompleted) {
       alert('Complete all required steps before publishing');
       return;
     }
 
-    setSaveStatus('saving');
+    // Show publish confirmation modal
+    setShowPublishModal(true);
+  };
+
+  // Confirm and execute publish
+  const handleConfirmPublish = async (publishData: any) => {
+    setIsPublishing(true);
     setErrorMessage('');
 
     try {
-      // Call the new publish endpoint which copies draft to production
-      const response = await fetch(`http://localhost:8001/api/triggers/${triggerId}/publish`, {
+      // Call the publish endpoint which copies draft to production
+      // Send selected_model to override the models from draft
+      const requestBody: any = {
+        published_by: publishData.published_by || "system",
+        notes: publishData.notes
+      };
+
+      // If user selected a specific model for production, send it
+      if (publishData.selected_model) {
+        requestBody.model_settings = {
+          selected_models: [publishData.selected_model], // Single model array
+          temperature: publishData.model_settings?.temperature || 0.7,
+          max_tokens: publishData.model_settings?.max_tokens || 1000
+        };
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/triggers/${triggerId}/publish`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          published_by: "system" // TODO: Replace with actual user ID when auth is implemented
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -492,12 +730,14 @@ export default function ConfigurationPage({ params }: PageProps) {
       const result = await response.json();
       console.log('Configuration published:', result);
 
+      setIsPublishing(false);
+      setShowPublishModal(false);
       setSaveStatus('success');
       alert(`Configuration published successfully! Version ${result.draft_version_published} is now live.`);
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('Publish error:', error);
-      setSaveStatus('error');
+      setIsPublishing(false);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to publish configuration');
     }
   };
@@ -590,13 +830,18 @@ export default function ConfigurationPage({ params }: PageProps) {
           ))}
         </div>
 
-        {/* Main Content Area */}
+        {/* Main Content Area - Wrap with all context providers */}
+        {/* Provider order: PromptProvider > GenerationProvider > ModelProvider */}
+        {/* ModelProvider needs PromptContext for cost estimation (checkedTypes) */}
         <PromptProvider>
           <GenerationProvider>
-            {/* Set triggerId to trigger auto-load */}
-            <TriggerIdSetter triggerId={triggerId} />
+            <ModelProvider triggerId={triggerId}>
+              {/* Set triggerId to trigger auto-load */}
+              <TriggerIdSetter triggerId={triggerId} />
+              {/* Track testing completion based on generation results */}
+              <TestingCompletionTracker onTestingComplete={handleTestingComplete} />
 
-            <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
+              <div style={{ flex: 1, padding: '32px', paddingBottom: '100px' }}>
             {/* Trigger Context Bar */}
           <div style={{
             background: '#ffffff',
@@ -1168,6 +1413,30 @@ export default function ConfigurationPage({ params }: PageProps) {
                         ]}
                         onSectionsChange={() => {}}  // Read-only for OLD mode
                       />
+
+                      {/* Use This Arrangement Button - OLD Mode */}
+                      <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
+                        <Button
+                          variant="primary"
+                          size="lg"
+                          onClick={async () => {
+                            // Save configuration before navigating
+                            await handleSaveDraft();
+                            setCompletedSteps(prev => ({ ...prev, sections: true }));
+                            setActiveStep('prompts');
+                          }}
+                          disabled={!oldData}
+                          style={{
+                            width: '320px',
+                            height: '56px',
+                            fontSize: '18px',
+                            fontWeight: 600
+                          }}
+                        >
+                          <i className="bi bi-check-circle me-2"></i>
+                          Use This Arrangement
+                        </Button>
+                      </div>
                     </div>
                   </>
                 )}
@@ -1175,7 +1444,9 @@ export default function ConfigurationPage({ params }: PageProps) {
                 {/* NEW Mode - Show selected NEW sections only */}
                 {dataMode === 'NEW' && newSectionsData.length > 0 && selectedSectionIds.length > 0 && (() => {
                   // Build Section[] from selected IDs and generated data
-                  const selectedSections = selectedSectionIds
+                  // Use sectionOrder if available to preserve user's drag-and-drop arrangement
+                  const orderToUse = sectionOrder.length > 0 ? sectionOrder : selectedSectionIds;
+                  const selectedSections = orderToUse
                     .map(sectionId => {
                       const sectionData = newSectionsData.find(s => s.section_id === sectionId);
                       if (!sectionData) return null;
@@ -1203,10 +1474,37 @@ export default function ConfigurationPage({ params }: PageProps) {
                         <SectionManagementPanel
                           sections={selectedSections}
                           onSectionsChange={(reorderedSections) => {
-                            // Update selectedSectionIds to match the new order
-                            setSelectedSectionIds(reorderedSections.map(s => s.id));
+                            // Update section order when user rearranges sections
+                            const newOrder = reorderedSections.map(s => s.id);
+                            setSectionOrder(newOrder);
+                            // Keep selectedSectionIds as the original selection (not reordered)
+                            // This allows us to track which sections are selected vs their order
                           }}
                         />
+
+                        {/* Use This Arrangement Button - NEW Mode */}
+                        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
+                          <Button
+                            variant="primary"
+                            size="lg"
+                            onClick={async () => {
+                              // Save section order before navigating
+                              await handleSaveDraft();
+                              setCompletedSteps(prev => ({ ...prev, sections: true }));
+                              setActiveStep('prompts');
+                            }}
+                            disabled={selectedSectionIds.length === 0}
+                            style={{
+                              width: '320px',
+                              height: '56px',
+                              fontSize: '18px',
+                              fontWeight: 600
+                            }}
+                          >
+                            <i className="bi bi-check-circle me-2"></i>
+                            Use This Arrangement
+                          </Button>
+                        </div>
                       </div>
                     </>
                   );
@@ -1214,27 +1512,48 @@ export default function ConfigurationPage({ params }: PageProps) {
 
                 {/* OLD_NEW Mode - Show OLD section + selected NEW sections */}
                 {dataMode === 'OLD_NEW' && oldData && newSectionsData.length > 0 && selectedSectionIds.length > 0 && (() => {
-                  // Build combined Section[] with OLD data as first section + NEW sections
+                  // Build combined Section[] with OLD data + NEW sections
                   const oldSection: Section = {
                     id: 'old_data',
                     name: 'OLD Data (Complete)',
                     source: 'old' as const
                   };
 
-                  const newSections = selectedSectionIds
-                    .map(sectionId => {
-                      const sectionData = newSectionsData.find(s => s.section_id === sectionId);
-                      if (!sectionData) return null;
-                      return {
-                        id: sectionData.section_id,
-                        name: sectionData.section_title || `Section ${sectionData.section_id}`,
-                        source: 'new' as const
-                      };
-                    })
-                    .filter((s): s is Section => s !== null);
+                  // Use sectionOrder if available to preserve user's drag-and-drop arrangement
+                  // sectionOrder includes both 'old_data' and NEW section IDs in the desired order
+                  let allSections: Section[];
 
-                  // Combine: OLD section first, then NEW sections
-                  const allSections = [oldSection, ...newSections];
+                  if (sectionOrder.length > 0) {
+                    // Build sections from sectionOrder (preserves user's arrangement)
+                    allSections = sectionOrder
+                      .map(sectionId => {
+                        if (sectionId === 'old_data') {
+                          return oldSection;
+                        }
+                        const sectionData = newSectionsData.find(s => s.section_id === sectionId);
+                        if (!sectionData) return null;
+                        return {
+                          id: sectionData.section_id,
+                          name: sectionData.section_title || `Section ${sectionData.section_id}`,
+                          source: 'new' as const
+                        };
+                      })
+                      .filter((s): s is Section => s !== null);
+                  } else {
+                    // Default order: OLD section first, then NEW sections
+                    const newSections = selectedSectionIds
+                      .map(sectionId => {
+                        const sectionData = newSectionsData.find(s => s.section_id === sectionId);
+                        if (!sectionData) return null;
+                        return {
+                          id: sectionData.section_id,
+                          name: sectionData.section_title || `Section ${sectionData.section_id}`,
+                          source: 'new' as const
+                        };
+                      })
+                      .filter((s): s is Section => s !== null);
+                    allSections = [oldSection, ...newSections];
+                  }
 
                   return (
                     <>
@@ -1248,18 +1567,41 @@ export default function ConfigurationPage({ params }: PageProps) {
 
                       <div>
                         <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#212529', marginBottom: '16px' }}>
-                          Section Order (1 OLD + {newSections.length} NEW sections)
+                          Section Order (1 OLD + {selectedSectionIds.length} NEW sections)
                         </h3>
                         <SectionManagementPanel
                           sections={allSections}
                           onSectionsChange={(reorderedSections) => {
-                            // Extract only NEW section IDs (filter out OLD section)
-                            const newSectionIds = reorderedSections
-                              .filter(s => s.source === 'new')
-                              .map(s => s.id);
-                            setSelectedSectionIds(newSectionIds);
+                            // Save complete order including OLD section position
+                            const completeOrder = reorderedSections.map(s => s.id);
+                            setSectionOrder(completeOrder);
+                            // This preserves the position of 'old_data' section in the arrangement
                           }}
                         />
+
+                        {/* Use This Arrangement Button - OLD_NEW Mode */}
+                        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center' }}>
+                          <Button
+                            variant="primary"
+                            size="lg"
+                            onClick={async () => {
+                              // Save section order before navigating
+                              await handleSaveDraft();
+                              setCompletedSteps(prev => ({ ...prev, sections: true }));
+                              setActiveStep('prompts');
+                            }}
+                            disabled={!oldData || selectedSectionIds.length === 0}
+                            style={{
+                              width: '320px',
+                              height: '56px',
+                              fontSize: '18px',
+                              fontWeight: 600
+                            }}
+                          >
+                            <i className="bi bi-check-circle me-2"></i>
+                            Use This Arrangement
+                          </Button>
+                        </div>
                       </div>
                     </>
                   );
@@ -1365,6 +1707,7 @@ export default function ConfigurationPage({ params }: PageProps) {
                     dataMode={dataMode}
                     stockId={stockId}
                     selectedSections={selectedSections}
+                    onValidationChange={handlePromptsValidation}
                   />
                 </Col>
               </Row>
@@ -1379,36 +1722,34 @@ export default function ConfigurationPage({ params }: PageProps) {
               triggerId={triggerId}
             >
               <TestingStepWrapper promptTypes={promptTypes}>
-                <ModelProvider triggerId={triggerId}>
-                  {/* Toggle History Button */}
-                  <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant={showHistoryPanel ? 'primary' : 'outline-secondary'}
-                      size="sm"
-                      onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-                    >
-                      <i className={`bi bi-clock-history me-1`}></i>
-                      {showHistoryPanel ? 'Hide History' : 'View History'}
-                    </Button>
-                  </div>
+                {/* Toggle History Button */}
+                <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant={showHistoryPanel ? 'primary' : 'outline-secondary'}
+                    size="sm"
+                    onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                  >
+                    <i className={`bi bi-clock-history me-1`}></i>
+                    {showHistoryPanel ? 'Hide History' : 'View History'}
+                  </Button>
+                </div>
 
-                  <ModelSelection />
-                  <TestGenerationPanel />
+                <ModelSelection />
+                <TestGenerationPanel />
 
-                  {/* History Panel */}
-                  {showHistoryPanel && (
-                    <GenerationHistoryPanel
-                      triggerId={triggerId}
-                      onLoadConfiguration={(item) => {
-                        // TODO: Implement loading configuration from history item
-                        // This would populate the model selection, temperature, max_tokens
-                        // from the history item
-                        console.log('Load configuration from history:', item);
-                        alert('Load configuration feature coming soon! Check console for history item.');
-                      }}
-                    />
-                  )}
-                </ModelProvider>
+                {/* History Panel */}
+                {showHistoryPanel && (
+                  <GenerationHistoryPanel
+                    triggerId={triggerId}
+                    onLoadConfiguration={(item) => {
+                      // TODO: Implement loading configuration from history item
+                      // This would populate the model selection, temperature, max_tokens
+                      // from the history item
+                      console.log('Load configuration from history:', item);
+                      alert('Load configuration feature coming soon! Check console for history item.');
+                    }}
+                  />
+                )}
               </TestingStepWrapper>
             </DataProvider>
           )}
@@ -1419,53 +1760,59 @@ export default function ConfigurationPage({ params }: PageProps) {
               onNavigateToTesting={() => setActiveStep('testing')}
             />
           )}
+
+          {/* Publish Modal - inside providers */}
+          <PublishModalWrapperInner
+            show={showPublishModal}
+            onHide={() => setShowPublishModal(false)}
+            triggerName={triggerId}
+            dataMode={dataMode}
+            selectedSectionIds={selectedSectionIds}
+            sectionOrder={sectionOrder}
+            newSectionsData={newSectionsData}
+            onConfirm={handleConfirmPublish}
+            isPublishing={isPublishing}
+          />
+
+          {/* Sticky Bottom Actions Bar - inside providers so DraftSaveButton can access context */}
+          <div style={{
+            position: 'fixed',
+            bottom: 0,
+            left: '280px',
+            right: 0,
+            height: '72px',
+            background: '#ffffff',
+            borderTop: '1px solid #dee2e6',
+            padding: '16px 32px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
+            zIndex: 1000
+          }}>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <DraftSaveButton onSave={handleSaveDraft} saveStatus={saveStatus} />
+              <Button
+                variant="outline-secondary"
+                onClick={() => setShowHistoryModal(true)}
+                style={{ width: '120px', height: '40px' }}
+              >
+                View History
+              </Button>
+            </div>
+
+            <PublishButton
+              onPublish={handleSaveDraft}
+              onOpenModal={() => setShowPublishModal(true)}
+              disabled={!Object.values(completedSteps).every(v => v)}
+              saveStatus={saveStatus}
+              completedSteps={completedSteps}
+            />
           </div>
+          </div>
+            </ModelProvider>
           </GenerationProvider>
         </PromptProvider>
-      </div>
-
-      {/* Sticky Bottom Actions Bar */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: '280px',
-        right: 0,
-        height: '72px',
-        background: '#ffffff',
-        borderTop: '1px solid #dee2e6',
-        padding: '16px 32px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
-        zIndex: 1000
-      }}>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <Button
-            variant="outline-secondary"
-            onClick={handleSaveDraft}
-            disabled={saveStatus === 'saving'}
-            style={{ width: '120px', height: '40px' }}
-          >
-            {saveStatus === 'saving' ? <Spinner as="span" animation="border" size="sm" /> : 'Save Draft'}
-          </Button>
-          <Button
-            variant="outline-secondary"
-            style={{ width: '120px', height: '40px' }}
-          >
-            View History
-          </Button>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={handlePublish}
-          disabled={!Object.values(completedSteps).every(v => v) || saveStatus === 'saving'}
-          style={{ width: '140px', height: '40px', fontWeight: 600 }}
-          title={!Object.values(completedSteps).every(v => v) ? 'Complete all required steps before publishing' : ''}
-        >
-          {saveStatus === 'saving' ? <Spinner as="span" animation="border" size="sm" /> : 'Publish'}
-        </Button>
       </div>
 
       {/* Success/Error Alerts */}
@@ -1504,6 +1851,34 @@ export default function ConfigurationPage({ params }: PageProps) {
           {errorMessage || 'An error occurred'}
         </Alert>
       )}
+
+      {/* Version History Modal */}
+      <ConfigVersionHistoryModal
+        show={showHistoryModal}
+        onHide={() => setShowHistoryModal(false)}
+        triggerName={triggerId}
+        onRollbackSuccess={() => {
+          setShowHistoryModal(false);
+          // Optionally reload the page or refresh data after rollback
+          window.location.reload();
+        }}
+      />
+
+      {/* Workflow Guide Tour */}
+      <WorkflowGuideTour
+        currentStep={activeStep}
+        show={showWorkflowGuide}
+        onClose={() => setShowWorkflowGuide(false)}
+        onNext={() => {
+          // Optionally navigate to next step
+          const stepOrder: NavigationStep[] = ['data', 'sections', 'prompts', 'testing', 'results'];
+          const currentIndex = stepOrder.indexOf(activeStep);
+          if (currentIndex < stepOrder.length - 1) {
+            setActiveStep(stepOrder[currentIndex + 1]);
+          }
+        }}
+      />
+
     </div>
   );
 }
@@ -1518,6 +1893,7 @@ interface PromptEditorWrapperProps {
   dataMode: DataMode;
   stockId: string;
   selectedSections: SectionData[];
+  onValidationChange?: (isValid: boolean) => void;
 }
 
 function PromptEditorWrapper({
@@ -1525,7 +1901,8 @@ function PromptEditorWrapper({
   checkedTypes,
   selectedSections,
   dataMode,
-  stockId
+  stockId,
+  onValidationChange
 }: PromptEditorWrapperProps) {
   return (
     <DataProvider
@@ -1536,7 +1913,11 @@ function PromptEditorWrapper({
     >
       <ValidationProvider>
         <PreviewProvider>
-          <PromptEditorContent triggerId={triggerId} checkedTypes={checkedTypes} />
+          <PromptEditorContent
+            triggerId={triggerId}
+            checkedTypes={checkedTypes}
+            onValidationChange={onValidationChange}
+          />
         </PreviewProvider>
       </ValidationProvider>
     </DataProvider>
@@ -1544,8 +1925,8 @@ function PromptEditorWrapper({
 }
 
 // Inner component that uses the prompt context
-function PromptEditorContent({ triggerId, checkedTypes }: PromptEditorWrapperProps) {
-  const { setCheckedTypes } = usePrompt();
+function PromptEditorContent({ triggerId, checkedTypes, onValidationChange }: PromptEditorWrapperProps) {
+  const { setCheckedTypes, prompts, variantStrategy, strategyValidation } = usePrompt();
 
   // Sync checked types with PromptContext
   useEffect(() => {
@@ -1555,6 +1936,22 @@ function PromptEditorContent({ triggerId, checkedTypes }: PromptEditorWrapperPro
     if (checkedTypes.webCrawler) types.add('crawler');
     setCheckedTypes(types);
   }, [checkedTypes, setCheckedTypes]);
+
+  // Track prompts validation and notify parent
+  useEffect(() => {
+    if (!onValidationChange) return;
+
+    // Check if all required prompts are filled based on variant strategy
+    const requiredPrompts = getStrategyRequirements(variantStrategy).required;
+    const allPromptsFilled = requiredPrompts.every(promptType => {
+      const promptTemplate = prompts[promptType];
+      return promptTemplate && promptTemplate.content && promptTemplate.content.trim().length > 0;
+    });
+
+    // Also check strategy validation
+    const isValid = allPromptsFilled && strategyValidation.isValid;
+    onValidationChange(isValid);
+  }, [prompts, variantStrategy, strategyValidation]); // Removed onValidationChange to prevent infinite loop
 
   return <PromptEditor triggerId={triggerId} />;
 }
@@ -1651,5 +2048,107 @@ function VariantStrategySelector() {
         </Alert>
       )}
     </div>
+  );
+}
+
+// Publish Modal Wrapper Inner - Has access to PromptProvider and GenerationProvider
+interface PublishModalWrapperInnerProps {
+  show: boolean;
+  onHide: () => void;
+  triggerName: string;
+  dataMode: DataMode;
+  selectedSectionIds: string[];
+  sectionOrder: string[];  // Added to fix scope error
+  newSectionsData: any[];
+  onConfirm: (publishData: any) => void;
+  isPublishing: boolean;
+}
+
+function PublishModalWrapperInner({
+  show,
+  onHide,
+  triggerName,
+  dataMode,
+  selectedSectionIds,
+  sectionOrder,
+  newSectionsData,
+  onConfirm,
+  isPublishing
+}: PublishModalWrapperInnerProps) {
+  const { prompts, variantStrategy } = usePrompt();
+  const { results } = useGeneration();
+
+  // Extract models and settings from test results instead of separate API call
+  // This is more reliable and shows exactly what was tested
+  const availableModels = useMemo(() => {
+    const modelSet = new Set<string>();
+    results.forEach(result => {
+      if (result.model_id) {
+        modelSet.add(result.model_id);
+      }
+    });
+    return Array.from(modelSet);
+  }, [results]);
+
+  // Get temperature and max_tokens from first result metadata
+  const modelSettings = useMemo(() => {
+    const firstResult = results[0];
+    return {
+      selected_models: availableModels,
+      temperature: firstResult?.metadata?.temperature || 0.7,
+      max_tokens: firstResult?.metadata?.max_tokens || 1000
+    };
+  }, [availableModels, results]);
+
+  // Build configuration object
+  const configuration = {
+    apis: [], // TODO: Track APIs if needed
+    section_order: (sectionOrder.length > 0 ? sectionOrder : selectedSectionIds).map(id => {
+      // Use sectionOrder if available (user's arrangement), otherwise fall back to selectedSectionIds
+      const section = newSectionsData.find(s => s.section_id === id);
+      return section ? section.section_name : id;
+    }),
+    prompts: {
+      paid: prompts.paid.content,
+      unpaid: prompts.unpaid.content,
+      crawler: prompts.crawler.content
+    },
+    model_settings: modelSettings,
+    data_mode: dataMode,
+    variant_strategy: variantStrategy
+  };
+
+  // Build test results from generation results
+  const testResults: Record<string, any> = {};
+
+  // Group results by prompt type
+  const resultsByType = results.reduce((acc, result) => {
+    const type = result.prompt_type || 'paid';
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(result);
+    return acc;
+  }, {} as Record<string, GenerationResult[]>);
+
+  Object.entries(resultsByType).forEach(([promptType, typeResults]) => {
+    testResults[promptType] = {
+      models_tested: [...new Set(typeResults.map(r => r.model))],
+      total_tests: typeResults.length,
+      avg_cost: typeResults.reduce((sum, r) => sum + (r.cost || 0), 0) / typeResults.length,
+      avg_latency: typeResults.reduce((sum, r) => sum + (r.time_taken || 0), 0) / typeResults.length,
+      total_cost: typeResults.reduce((sum, r) => sum + (r.cost || 0), 0),
+      sample_output: typeResults[0]?.generated_text || ''
+    };
+  });
+
+  return (
+    <PublishConfirmationModal
+      show={show}
+      onHide={onHide}
+      triggerName={triggerName}
+      configuration={configuration}
+      testResults={testResults}
+      onConfirm={onConfirm}
+      isPublishing={isPublishing}
+    />
   );
 }

@@ -79,8 +79,10 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({
     return groups;
   }, [results]);
 
-  // Get results for active tab
-  const activeResults = groupedResults[activeTab];
+  // Get results for active tab (memoized to prevent unnecessary recalculations)
+  const activeResults = useMemo(() => {
+    return groupedResults[activeTab] || [];
+  }, [groupedResults, activeTab]);
 
   // Calculate best performers for active tab
   const bestPerformers = useMemo(() => {
